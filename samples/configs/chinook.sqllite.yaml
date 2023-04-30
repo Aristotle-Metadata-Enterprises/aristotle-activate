@@ -1,12 +1,35 @@
-# The database URL of the source system to scan
-# https://docs.sqlalchemy.org/en/20/core/engines.html
-database_url: "sqlite:///{config_dir}/../databases/chinook.db"
+
+connector:
+  type: database
+  options:
+    # The database URL of the source system to scan
+    # https://docs.sqlalchemy.org/en/20/core/engines.html
+    database_url: "sqlite:///{config_dir}/../databases/chinook.db"
+
+  # Future types
+  # type: airtable: https://airtable.com/developers/web/api/list-bases
+  # type: excel
+  # type: snowflake? If we don't 
 
 # The name for the system to scan - this will not over ride contents within Aristotle
-# Is this required?
+# Is this required? Yes - on the first pass at least
 name: "Chinook Database"
 
-# A list of tables (or table like objects to exclude from scanning)
-exclude_tables: []
+aristotle:
+  registry_url: https://aristotle.cloud/
+  # workgroup: 1
+  # stewardship_organisation: uuid
 
-registry_url: https://aristotle.cloud/
+scan-options:
+  # 
+  object_types:
+    # - schemas
+    - tables
+    - columns
+    # - views
+
+  # list of tables to include?
+  # include: []
+
+  # A list of tables (or table like objects to exclude from scanning)?
+  # exclude: []

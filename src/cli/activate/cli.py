@@ -1,16 +1,16 @@
 import click
 import yaml
 
-from activate.lib.config import Config
-from activate.lib.scan import Scanner
-from activate.lib.loaddb import prepare_engine
-from activate.lib.progress import ProgressReporter
+from activate.utils.config import Config
+from activate.utils.scan import Scanner
+from activate.utils.loaddb import prepare_engine
+from activate.utils.progress import ProgressReporter
 
 
 @click.command()
 @click.option("--config", type=click.File("rb"))
 @click.option("-o", "--local-metadata-file", type=click.File("w"))
-def run(config, local_metadata_file):
+def activate_cli(config, local_metadata_file):
     configfile = config
     config = Config.prepare_from_stream(configfile)
     data = activate_metadata(config, configfile.name)
@@ -63,4 +63,4 @@ class ClickProgress(ProgressReporter):
 
 
 if __name__ == "__main__":
-    run()
+    activate_cli()

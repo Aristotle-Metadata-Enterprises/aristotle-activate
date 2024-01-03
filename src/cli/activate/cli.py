@@ -5,12 +5,14 @@ from activate.utils.config import Config
 from activate.utils.scan import Scanner
 from activate.utils.loaddb import prepare_engine
 from activate.utils.progress import ProgressReporter
+from activate.utils import registry
 
 
 @click.command()
-@click.option("--config", type=click.File("rb"))
+@click.option("--config", type=click.File("rb"), required=True)
 @click.option("-o", "--local-metadata-file", type=click.File("w"))
-def activate_cli(config, local_metadata_file):
+@click.option("-T", "--api-token", type=click.STRING)
+def activate_cli(config, local_metadata_file, api_token):
     configfile = config
     config = Config.prepare_from_stream(configfile)
     data = activate_metadata(config, configfile.name)
@@ -20,6 +22,11 @@ def activate_cli(config, local_metadata_file):
         click.echo(
             f"Activate scan complete. Results stored in {local_metadata_file.name}"
         )
+    else:
+        click.echo(f"Sending results to {config.config['registry']['url']}")
+        response = config.registry.send_payload(data)
+        print(response)
+
 
 
 def get_scanner(configfilename):

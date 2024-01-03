@@ -1,7 +1,7 @@
 import yaml
 import typing
 from activate.utils.exceptions import ConfigError
-
+from activate.utils.registry import Registry
 
 def reader(stream: typing.IO) -> dict:
     """
@@ -16,6 +16,7 @@ def reader(stream: typing.IO) -> dict:
 class Config:
     def __init__(self, config: dict):
         self.config = config
+        self.registry = Registry(**config['registry'])
 
     @classmethod
     def prepare_from_filename(cls, filename: str):

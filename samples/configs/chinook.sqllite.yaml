@@ -9,14 +9,16 @@ connector:
   # Future types
   # type: airtable: https://airtable.com/developers/web/api/list-bases
   # type: excel
-  # type: snowflake? If we don't 
+  # type: snowflake? If we don't connect with sqlalchemy
 
 # The name for the system to scan - this will not over ride contents within Aristotle
 # Is this required? Yes - on the first pass at least
 name: "Chinook Database"
 
-aristotle:
-  registry_url: https://aristotle.cloud/
+registry:
+  url: https://turbo-zebra-5vppvw69pg2pxg4-8000.app.github.dev/
+  api_token: 503bed3af3e245b989d76066bc5fbfa611e98ff2
+  plan: baf2e672-a860-11ee-af7a-0242ac120007
   # workgroup: 1
   # stewardship_organisation: uuid
 

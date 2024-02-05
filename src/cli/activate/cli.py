@@ -1,32 +1,42 @@
-import click
+import os
 import yaml
+import click
 
 from activate.utils.config import Config
-from activate.utils.scan import Scanner
+from activate.scanners.base import Scanner
 from activate.utils.loaddb import prepare_engine
 from activate.utils.progress import ProgressReporter
 from activate.utils import registry
 
 
 @click.command()
-@click.option("--config", type=click.File("rb"), required=True)
-@click.option("-o", "--local-metadata-file", type=click.File("w"))
-@click.option("-T", "--api-token", type=click.STRING)
-def activate_cli(config, local_metadata_file, api_token):
+@click.option("--config", type=click.File("rb"), required=True, help="Path to an Activate configuration file")
+@click.option("-o", "--output-file", type=click.File("w"), help="Path to a file to save generated metadata")
+@click.option("-U", "--upload", is_flag=True, show_default=True, default=False, help="Send generated metadata to a configured server")
+@click.option("-S", "--show", is_flag=True, show_default=True, default=False, help="Send generated metadata to terminal (STDOUT)")
+@click.option("-T", "--api-token", type=click.STRING, help="Optional API Token. This will override a token set in the configuration file")
+def activate_cli(config, output_file, upload, show, api_token):
     configfile = config
-    config = Config.prepare_from_stream(configfile)
+
+    # Change working directory to config file
+    # This is mostly necessary for sqllite database files in testing.
+    os.chdir(os.path.dirname(config.name))
+
+    config = Config.prepare_from_stream(config)
     data = activate_metadata(config, configfile.name)
 
-    if local_metadata_file:
-        yaml.dump(data, local_metadata_file)
+    if output_file:
+        yaml.dump(data, output_file)
         click.echo(
-            f"Activate scan complete. Results stored in {local_metadata_file.name}"
+            f"Activate scan complete. Results stored in {output_file.name}"
         )
-    else:
+    if show:
+        import pprint
+        click.echo(pprint.pformat(data))
+    if upload:
         click.echo(f"Sending results to {config.config['registry']['url']}")
         response = config.registry.send_payload(data)
         print(response)
-
 
 
 def get_scanner(configfilename):
@@ -40,7 +50,6 @@ def activate_metadata(config, configfilename):
     click.echo("Scanning schemas")
     with click.progressbar(label="Scanning:", length=100) as bar:
         scanner = Scanner.from_config(config, progress_callback=ClickProgress(bar))
-
         data = scanner.scan_datasets()
 
     return data
@@ -62,7 +71,7 @@ class ClickProgress(ProgressReporter):
     def add(self, val: int):
         import time
 
-        time.sleep(0.1)
+        time.sleep(0.01)
         self.update(min(99, self.progress + val))
 
     def echo(self, message: str, level: int = 0):

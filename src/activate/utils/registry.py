@@ -10,8 +10,16 @@ class Registry:
     api_token: str = ""
 
     endpoints = {
-        "send_payload": "/api/activate/plan/{self.plan}/activate"
+        "send_payload": "/api/activate/plan/{self.plan}/payload"
     }
+
+    def endpoint(self, endpoint):
+        if endpoint not in self.endpoints.keys():
+            1/0
+        base = self.url.rstrip("/")
+        endpoint = self.endpoints[endpoint].format(self=self).lstrip("/")
+        url = f"{base}/{endpoint}"
+        return url
 
     def get_api_token(self):
         if token := self.api_token:
@@ -19,11 +27,19 @@ class Registry:
         return ""
 
     def send_payload(self, data):
+        url = self.endpoint("send_payload")
+        token = self.get_api_token()
+
         headers = {
             "Content-Type": "application/json",
-            "Authorization": self.get_api_token()
+            "Authorization": f"Token {token}"
         }
+        print(headers)
 
-        response = requests.post(self.url, headers=headers, json=data)
-
+        response = requests.post(
+            url,
+            headers=headers, json=data, verify=False
+        )
+        rr = response
+        # import pdb; pdb.set_trace()
         return response

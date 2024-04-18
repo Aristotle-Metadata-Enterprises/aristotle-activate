@@ -1,12 +1,11 @@
 import os
 import yaml
 import click
+import json
 
 from activate.utils.config import Config
 from activate.scanners.base import Scanner
-from activate.utils.loaddb import prepare_engine
 from activate.utils.progress import ProgressReporter
-from activate.utils import registry
 
 
 @click.command()
@@ -36,7 +35,12 @@ def activate_cli(config, output_file, upload, show, api_token):
     if upload:
         click.echo(f"Sending results to {config.config['registry']['url']}")
         response = config.registry.send_payload(data)
-        print(response)
+
+        if response.status_code == 201:
+            click.echo('The following item uuids have been activated.')
+            click.echo(json.loads(response.content))
+        else:
+            click.echo(f'Failed to activate items: {response.content}')
 
 
 def get_scanner(configfilename):

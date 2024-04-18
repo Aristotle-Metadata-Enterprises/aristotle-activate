@@ -6,16 +6,14 @@ import uuid
 @dataclass
 class Registry:
     url: str
-    plan: uuid.UUID
+    # plan: uuid.UUID
     api_token: str = ""
 
     endpoints = {
-        "send_payload": "/api/activate/plan/{self.plan}/payload"
+        "send_payload": "/api/activate/payload"
     }
 
     def endpoint(self, endpoint):
-        if endpoint not in self.endpoints.keys():
-            1/0
         base = self.url.rstrip("/")
         endpoint = self.endpoints[endpoint].format(self=self).lstrip("/")
         url = f"{base}/{endpoint}"
@@ -34,12 +32,9 @@ class Registry:
             "Content-Type": "application/json",
             "Authorization": f"Token {token}"
         }
-        print(headers)
 
         response = requests.post(
             url,
             headers=headers, json=data, verify=False
         )
-        rr = response
-        # import pdb; pdb.set_trace()
         return response

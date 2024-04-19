@@ -40,7 +40,7 @@ def activate_cli(config, output_file, upload, show, api_token):
             click.echo('The following item uuids have been activated.')
             click.echo(json.loads(response.content))
         else:
-            click.echo(f'Failed to activate items: {response.content}')
+            click.echo(f'Failed to activate items: {json.loads(response.content)}')
 
 
 def get_scanner(configfilename):

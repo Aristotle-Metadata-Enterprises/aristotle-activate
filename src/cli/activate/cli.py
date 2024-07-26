@@ -34,11 +34,14 @@ def activate_cli(config, output_file, upload, show, api_token):
         click.echo(pprint.pformat(data))
     if upload:
         click.echo(f"Sending results to {config.config['registry']['url']}")
-        response = config.registry.send_payload(data)
+        pipeline, response = config.registry.send_payload(data)
 
         if response.status_code == 201:
-            click.echo('The following item uuids have been activated.')
-            click.echo(json.loads(response.content))
+            if pipeline:
+                click.echo(f'The payload has been sent to pipeline {pipeline}')
+            else:
+                click.echo('The following item uuids have been activated.')
+                click.echo(json.loads(response.content))
         else:
             click.echo(f'Failed to activate items: {json.loads(response.content)}')
 

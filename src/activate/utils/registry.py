@@ -6,11 +6,12 @@ import uuid
 @dataclass
 class Registry:
     url: str
-    # plan: uuid.UUID
+    pipeline: uuid.UUID = None
     api_token: str = ""
 
     endpoints = {
-        "send_payload": "/api/activate/payload"
+        "send_payload": "/api/activate/payload",
+        "send_payload_to_pipeline": "/api/activate/pipeline/{self.pipeline}/payload"
     }
 
     def endpoint(self, endpoint):
@@ -25,7 +26,10 @@ class Registry:
         return ""
 
     def send_payload(self, data):
-        url = self.endpoint("send_payload")
+        if self.pipeline:
+            url = self.endpoint("send_payload_to_pipeline")
+        else:
+            url = self.endpoint("send_payload")
         token = self.get_api_token()
 
         headers = {
@@ -37,4 +41,4 @@ class Registry:
             url,
             headers=headers, json=data, verify=False
         )
-        return response
+        return self.pipeline, response

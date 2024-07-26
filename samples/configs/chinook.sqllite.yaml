@@ -17,8 +17,8 @@ name: "Chinook Database"
 
 registry:
   url: http://127.0.0.1:8000/
-  api_token: 406cd273f33de9a7fc8d9e52a59d4625d2b1e0f3
-#  plan: fc96cde4-e7fa-11ee-8303-0242ac140008
+  api_token: 54e9eff1f7dbcb50b23bac8d22937b478629c556
+  pipeline: 622e2784-4add-11ef-bcce-0242ac110007
 
 scan-options:
   # 

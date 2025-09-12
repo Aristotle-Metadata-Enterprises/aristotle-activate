@@ -23,7 +23,7 @@ from activate.utils.progress import ProgressReporter
 @click.option("--disable-ssl-verification", is_flag=True, show_default=True, default=False, help="Disable SSL certificate verification. This is only recommended for testing or debug purposes.")
 @click.option("--items-per-chunk", type=int, help="Override the number of items to send per chunk/payload. Default is 75. Maximum is 150.")
 @click.option("--dry-run", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by priority hints. Only valid for output file (-o) or show (-S)")
-def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, priority, metadata_types, disable_ssl_verification, items_per_chunk, dry_run):
+def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, priority, metadata_types, disable_ssl_verification, items_per_chunk, dry_run, description):
     configfile = config
 
     # Change working directory to config file
@@ -71,10 +71,12 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
     if show:
         click.echo("Printing to STDOUT")
         click.echo(json.dumps(data, indent=4))
+
     if upload:
         click.echo(f"Sending results to {config.config['registry']['url']}")
         click.echo(f"Waiting 3 seconds before sending... press Crtl-C to abort...")
         time.sleep(3)
+
         if metadata_types:
             metadata_types_to_send = metadata_types.split(",")
         else:

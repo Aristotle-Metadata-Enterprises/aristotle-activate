@@ -33,7 +33,7 @@ class Registry:
             return token
         return ""
 
-    def send_payload(self, data):
+    def send_payload(self, description, data):
         if self.pipeline:
             url = self.endpoint("send_payload_to_pipeline")
         else:

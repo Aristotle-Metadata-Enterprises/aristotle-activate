@@ -1,0 +1,21 @@
+[project]
+name = "activate"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Aristotle Metadata", email="hello@aristotlemetadata.com"} 
+]
+readme = "README.md"
+
+# requires-python = ">=3.12"
+dependencies = [
+    "click>=8.2.1",
+    "lxml>=6.0.1",
+    "pyyaml>=6.0.2",
+    "requests>=2.32.5",
+    "sqlalchemy>=2.0.43",
+    "turfpy>=0.0.8",
+]
+
+[project.scripts]
+activateme = 'cli.activate.cli:activate_cli'

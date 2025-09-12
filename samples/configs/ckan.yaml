@@ -1,0 +1,107 @@
+
+connector:
+  type: activate.scanners.ckan.CKANScanner
+  options:
+    # The database URL of the source system to scan
+    # https://docs.sqlalchemy.org/en/20/core/engines.html
+    ckan_url: "https://pacificdata.org/data/"
+    mapping:
+      dataset:
+        # Map CKAN fields to Aristotle fields
+        name: title
+        version: version
+        definition: notes
+        rights: license_title
+        updated_date:
+          type: parse_date
+          field: modified
+          format: "%Y-%m-%d"
+        temporal: 
+          type: concat
+          separator: " "
+          values:
+            - type: field
+              field: temporal_start
+            - type: string
+              value: "to"
+            - type: field
+              field: temporal_end
+        slots:
+          - name: "Regions"
+            type: ""
+            value:
+              type: join
+              field: regions
+              separator: ", "
+          - name: "Themes"
+            type: ""
+            value:
+              type: join
+              field: thematic_area_string
+              separator: ", "
+          - name: "Publishers"
+            type: ""
+            value:
+              type: join
+              field: publisher_names
+              separator: ", "
+          - name: "Member Countries"
+            type: ""
+            value:
+              type: join
+              field: member_countries
+              separator: ", "
+        landing_page: 
+          type: concat
+          separator: ""
+          values:
+            - type: string
+              value: https://pacificdata.org/data/
+            - type: field
+              field: id
+        advanced_coverage:
+          type: dict
+          keys:
+            bounding_box:
+              type: geojson_to_bbox
+              field: spatial
+            "temporal_from":
+              type: parse_date
+              field: temporal_start
+              format: "%Y-%m-%d"
+            "temporal_to": 
+              type: parse_date
+              field: temporal_end
+              format: "%Y-%m-%d"
+
+    search:
+      # Optional search parameters to filter datasets from CKAN
+      # See https://docs.ckan.org/en/2.9/api/#ckan.logic.action.get.package_search
+      # q: "organization:pacific-data"
+      rows: 1 # Number of datasets to retrieve per request
+      fq: "dataset AND temporal_start:[1900-01-01T00:00:00Z TO *]"
+      sort: metadata_modified desc
+
+# The name for the system to scan - this will not over ride contents within Aristotle
+# Is this required? Yes - on the first pass at least
+name: "CKAN Test"
+
+registry:
+  url: https://spc.aristotlecloud.io/
+  api_token: d2748e6174ce37791ac4e683b5ececc2f556e98c
+  pipeline: d6f0858e-8ec1-11f0-97f8-0a58a9feac02
+
+scan-options:
+  # 
+  object_types:
+    # - schemas
+    - tables
+    - columns
+    # - views
+
+  # list of tables to include?
+  # include: []
+
+
+  # A list of tables (or table like objects to exclude from scanning)?
+  # exclude: []

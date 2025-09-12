@@ -14,7 +14,8 @@ from activate.utils.progress import ProgressReporter
 @click.option("-U", "--upload", is_flag=True, show_default=True, default=False, help="Send generated metadata to a configured server")
 @click.option("-S", "--show", is_flag=True, show_default=True, default=False, help="Send generated metadata to terminal (STDOUT)")
 @click.option("-T", "--api-token", type=click.STRING, help="Optional API Token. This will override a token set in the configuration file")
-def activate_cli(config, output_file, upload, show, api_token):
+@click.option("-D", "--description", type=click.STRING, default="", help="An optional description to add to the payload")
+def activate_cli(config, output_file, upload, show, api_token, description):
     configfile = config
 
     # Change working directory to config file
@@ -31,10 +32,10 @@ def activate_cli(config, output_file, upload, show, api_token):
         )
     if show:
         import pprint
-        click.echo(pprint.pformat(data))
+        click.echo(json.dumps(data, indent=4))
     if upload:
         click.echo(f"Sending results to {config.config['registry']['url']}")
-        pipeline, response = config.registry.send_payload(data)
+        pipeline, response = config.registry.send_payload(description, data)
 
         if response.status_code == 201:
             if pipeline:

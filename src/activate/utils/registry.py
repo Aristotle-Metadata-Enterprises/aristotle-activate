@@ -25,7 +25,7 @@ class Registry:
             return token
         return ""
 
-    def send_payload(self, data):
+    def send_payload(self, description, data):
         if self.pipeline:
             url = self.endpoint("send_payload_to_pipeline")
         else:
@@ -37,8 +37,13 @@ class Registry:
             "Authorization": f"Token {token}"
         }
 
+        payload = {
+            "description": description,
+            "payload_data": data
+        }
+
         response = requests.post(
             url,
-            headers=headers, json=data, verify=False
+            headers=headers, json=payload, verify=False
         )
         return self.pipeline, response

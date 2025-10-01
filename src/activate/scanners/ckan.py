@@ -17,6 +17,8 @@ import json
 
 OMIT_FIELD = "Do not output this field in dictionary"
 
+# We can't use truthiness, or None as both of these are valid values which we may want to retain and pass through.
+VALUE_NOT_SET = "This value has not been set"
 
 class CKANScanner(Scanner):
     name = "ckan"
@@ -84,56 +86,74 @@ class CKANScanner(Scanner):
         """
         Maps and converts a single field to Aristotle's format.
         """
+        final_value = VALUE_NOT_SET
+        default_value = VALUE_NOT_SET
+        if type(conf) is str:
+            conf = {
+                "type": "field",
+                "field": conf
+            }
+            default_value = "Unknown value"
+
         if type(conf) is list:
             pass
-        elif type(conf) is str or conf['type'] == 'field':
-            if type(conf) is str:
-                value = source.get(conf, None)
-            else:
-               value = source.get(conf['field'], None) 
-            if value:
-                return value
-            else:
-                return 'Unknown value'
-        elif conf['type'] == 'parse_date':
-            value = source.get(conf['field'], None)
-            if value:
-                try:
-                    format_string = conf.get('format', '%Y-%m-%dT%H:%M:%S%z')
-                    dt = datetime.strptime(value, format_string)
-                    return dt.isoformat()
-                except:
-                    return OMIT_FIELD
-            else:
-                return OMIT_FIELD
-        elif conf['type'] == 'string':
-            return conf['value']
-        elif conf['type'] == 'geojson_to_bbox':
-            if geojson_obj := source.get(conf['field'], None):
-                tp = self.geojson_to_turfpy(geojson_obj)
-                bbox_coords = bbox(tp)
-                return bbox_coords
-            else:
-                return OMIT_FIELD
         elif type(conf) is dict:
             if conf['type'] == 'concat':
                 values = []
                 for inner_conf in conf['values']:
                     values.append(self.field_to_aristotle(inner_conf, source))
                 separator = conf.get('separator', '')
-                return separator.join(values)
-            if conf['type'] == 'join':
+                final_value = separator.join(values)
+            elif conf['type'] == 'field':
+                final_value = source.get(conf['field'], None)
+            elif conf['type'] == 'parse_date':
+                value = source.get(conf['field'], None)
+                if value:
+                    try:
+                        format_string = conf.get('format', '%Y-%m-%dT%H:%M:%S%z')
+                        dt = datetime.strptime(value, format_string)
+                        final_value = dt.isoformat()
+                    except:
+                        final_value = OMIT_FIELD
+                else:
+                    final_value = OMIT_FIELD
+            elif conf['type'] == 'string':
+                final_value = str(conf['value'])
+            elif conf['type'] == 'literal':
+                final_value = conf['value']
+            elif conf['type'] == 'geojson_to_bbox':
+                if geojson_obj := source.get(conf['field'], None):
+                    tp = self.geojson_to_turfpy(geojson_obj)
+                    bbox_coords = bbox(tp)
+                    final_value = str(bbox_coords)
+                else:
+                    final_value = OMIT_FIELD
+            elif conf['type'] == 'join':
                 values = source.get(conf['field'], [])
                 separator = conf.get('separator', '')
-                return separator.join(values)
-            if conf['type'] == 'dict':
+                if values:
+                    final_value = separator.join(values)
+            elif conf['type'] == 'list':
+                values = []
+                for inner_conf in conf['values']:
+                    values.append(self.field_to_aristotle(inner_conf, source))
+                final_value = values
+            elif conf['type'] == 'dict':
                 value = {}
                 for key, item in conf['keys'].items():
                     output = self.field_to_aristotle(item, source)
                     if output != OMIT_FIELD:
                         value[key] = output
-                return value
-        return ""
+                final_value = value
+
+            if default_value == VALUE_NOT_SET:
+                default_value = conf.get("default", "Unknown value")
+            if conf.get("on_null", "keep") == "set_default":
+                final_value = VALUE_NOT_SET     
+
+        if final_value == VALUE_NOT_SET:
+            final_value = default_value
+        return final_value
 
 
     def scan_dataset(self, source) -> dict:
@@ -145,7 +165,7 @@ class CKANScanner(Scanner):
             "uuid": self.make_active_id('dataset', source['id']),
             "name": source['title'],
             "datasetdistributionpath_set": [],
-            "origin_uri": f"{self.ckan_url}/dataset/{source['id']}"
+            "origin_URI": f"{self.ckan_url}/dataset/{source['id']}"
         }
 
         dataset_mapping = self.ckan.get('mapping', {}).get('dataset', {})

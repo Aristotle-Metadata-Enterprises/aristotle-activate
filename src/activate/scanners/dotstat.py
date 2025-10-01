@@ -53,7 +53,7 @@ class DotStatScanner(Scanner):
         elem = xml.find(element_name, namespaces=NAMESPACES)
         if elem is not None:
             return elem.text
-        return "No name found"
+        return ""
 
     def scan_datasets(self):
         self.progress.update(1, "Scanning Dotstat datasets")
@@ -68,16 +68,16 @@ class DotStatScanner(Scanner):
 
         dataflows = tree.findall('./message:Structures/structure:Dataflows/structure:Dataflow', namespaces=NAMESPACES)
 
-        for df in dataflows[:1]:
+        for df in dataflows[:50]:
             df_id = df.attrib.get('id', None)
             df_agency_id = df.attrib.get('agencyID', None)
             dataset = {
                 "uuid": self.make_active_id('dataset', df_id),
                 # "name": self.multilingual_text('./common:Name', df),
-                # "description": self.multilingual_text('common:Description', df),
+                # "definition": self.multilingual_text('common:Description', df),
                 "name": self.first_multilingual_text('./common:Name', df),
-                "description": self.first_multilingual_text('common:Description', df),
-                "origin_uri": f"{self.dotstat_url}/vis?vw=ov&df[ds]=ds%3A{df_agency_id}2&df[id]={df_id}&df[ag]={df_agency_id}"
+                "definition": self.first_multilingual_text('common:Description', df),
+                "origin_URI": f"{self.dotstat_url}/vis?vw=ov&df[ds]=ds%3A{df_agency_id}2&df[id]={df_id}&df[ag]={df_agency_id}"
             }
             self.add_metadata("dataset", dataset["uuid"], dataset)
 
@@ -169,7 +169,7 @@ class DotStatScanner(Scanner):
             "uuid": self.make_active_id('dataset', source['id']),
             "name": source['title'],
             "datasetdistributionpath_set": [],
-            "origin_uri": f"{self.dotstat_api_url}/dataset/{source['id']}"
+            "origin_URI": f"{self.dotstat_api_url}/dataset/{source['id']}"
         }
 
         dataset_mapping = self.ckan.get('mapping', {}).get('dataset', {})

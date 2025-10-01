@@ -9,7 +9,11 @@ connector:
       dataset:
         # Map CKAN fields to Aristotle fields
         name: title
-        version: version
+        version:
+          type: field
+          field: version
+          default: ""
+          on_null: "set_default"
         definition: notes
         rights: license_title
         updated_date:
@@ -27,30 +31,60 @@ connector:
             - type: field
               field: temporal_end
         slots:
-          - name: "Regions"
-            type: ""
-            value:
-              type: join
-              field: regions
-              separator: ", "
-          - name: "Themes"
-            type: ""
-            value:
-              type: join
-              field: thematic_area_string
-              separator: ", "
-          - name: "Publishers"
-            type: ""
-            value:
-              type: join
-              field: publisher_names
-              separator: ", "
-          - name: "Member Countries"
-            type: ""
-            value:
-              type: join
-              field: member_countries
-              separator: ", "
+          type: list
+          values:
+            - type: dict
+              keys:
+                name: 
+                  type: string
+                  value: "Regions"
+                permission: 
+                  type: literal
+                  value: 0
+                value:
+                  type: join
+                  field: regions
+                  separator: ", "
+                  default: " - "
+            - type: dict
+              keys:
+                name: 
+                  type: string
+                  value: "Themes"
+                permission: 
+                  type: literal
+                  value: 0
+                value:
+                  type: join
+                  field: thematic_area_string
+                  separator: ", "
+                  default: " - "
+            - type: dict
+              keys:
+                name: 
+                  type: string
+                  value: "Publishers"
+                permission: 
+                  type: literal
+                  value: 0
+                value:
+                  type: join
+                  field: publisher_names
+                  separator: ", "
+                  default: " - "
+            - type: dict
+              keys:
+                name: 
+                  type: string
+                  value: "Member Countries"
+                permission: 
+                  type: literal
+                  value: 0
+                value:
+                  type: join
+                  field: member_countries
+                  separator: ", "
+                  default: " - "
         landing_page: 
           type: concat
           separator: ""
@@ -59,26 +93,26 @@ connector:
               value: https://pacificdata.org/data/
             - type: field
               field: id
-        advanced_coverage:
-          type: dict
-          keys:
-            bounding_box:
-              type: geojson_to_bbox
-              field: spatial
-            "temporal_from":
-              type: parse_date
-              field: temporal_start
-              format: "%Y-%m-%d"
-            "temporal_to": 
-              type: parse_date
-              field: temporal_end
-              format: "%Y-%m-%d"
+        # advanced_coverage:
+        #   type: dict
+        #   keys:
+        #     bounding_box:
+        #       type: geojson_to_bbox
+        #       field: spatial
+        #     "temporal_from":
+        #       type: parse_date
+        #       field: temporal_start
+        #       format: "%Y-%m-%d"
+        #     "temporal_to": 
+        #       type: parse_date
+        #       field: temporal_end
+        #       format: "%Y-%m-%d"
 
     search:
       # Optional search parameters to filter datasets from CKAN
       # See https://docs.ckan.org/en/2.9/api/#ckan.logic.action.get.package_search
       # q: "organization:pacific-data"
-      rows: 1 # Number of datasets to retrieve per request
+      rows: 100 # Number of datasets to retrieve per request
       fq: "dataset AND temporal_start:[1900-01-01T00:00:00Z TO *]"
       sort: metadata_modified desc
 

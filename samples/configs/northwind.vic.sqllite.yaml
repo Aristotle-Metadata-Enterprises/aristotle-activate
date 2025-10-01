@@ -1,0 +1,35 @@
+
+connector:
+  type: activate.scanners.alchemy.AlchemyScanner
+  options:
+    # The database URL of the source system to scan
+    # https://docs.sqlalchemy.org/en/20/core/engines.html
+    database_url: "sqlite:///../databases/northwind.db"
+
+  # Future types
+  # type: airtable: https://airtable.com/developers/web/api/list-bases
+  # type: excel
+  # type: snowflake? If we don't connect with sqlalchemy
+
+# The name for the system to scan - this will not over ride contents within Aristotle
+# Is this required? Yes - on the first pass at least
+name: "Northwind Database"
+
+registry:
+  url: https://vic-edu-evaluation.aristotlecloud.io/
+  api_token: 6d965d6b24c1dddd0c0a08e51e67c5c8b7a9a3e4
+  pipeline: 3da6e8e8-8fa0-11f0-896d-0a58a9feac02
+
+scan-options:
+  # 
+  object_types:
+    # - schemas
+    - tables
+    - columns
+    # - views
+
+  # list of tables to include?
+  # include: []
+
+  # A list of tables (or table like objects to exclude from scanning)?
+  # exclude: []

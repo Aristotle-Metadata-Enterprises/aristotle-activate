@@ -13,7 +13,7 @@ name: "CKAN Test"
 registry:
   url: https://spc.aristotlecloud.io/
   api_token: d2748e6174ce37791ac4e683b5ececc2f556e98c
-  pipeline: d6f0858e-8ec1-11f0-97f8-0a58a9feac02
+  pipeline: d78a7ca6-8ecc-11f0-adc1-0a58a9feac02
 
 scan-options:
   # 

@@ -14,9 +14,16 @@ def reader(stream: typing.IO) -> dict:
 
 
 class Config:
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, registry_cli):
         self.config = config
-        self.registry = Registry(**config['registry'])
+        registry_args = config.get('registry', {})
+        print(f"{registry_args}")
+        print(f"{registry_cli}")
+        if registry_cli:
+            registry_args.update(registry_cli)
+        print(f"{registry_args}")
+        self.registry = Registry(**registry_args)
+        print(f"{self.registry.pipeline=}")
 
     @classmethod
     def prepare_from_filename(cls, filename: str):
@@ -24,8 +31,8 @@ class Config:
             return cls.prepare_from_stream(stream)
 
     @classmethod
-    def prepare_from_stream(cls, filelike: typing.IO):
-        config = cls(reader(filelike))
+    def prepare_from_stream(cls, filelike: typing.IO, registry_cli: dict = {}):
+        config = cls(reader(filelike), registry_cli)
 
         if config.config["connector"]["type"] == "database":
             db_url = config.config["connector"]["options"]["database_url"]

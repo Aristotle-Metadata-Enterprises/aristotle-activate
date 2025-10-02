@@ -14,8 +14,12 @@ def register(scanner_class):
     scanners_register[scanner_class.name] = scanner_class
 
 
+class ConfigError(Exception):
+    pass
+
 # We can't use truthiness, or None as both of these are valid values which we may want to retain and pass through.
 VALUE_NOT_SET = "This value has not been set"
+OMIT_FIELD = "This field should be omitted"
 
 
 class Scanner:
@@ -26,6 +30,7 @@ class Scanner:
         self.config = config
         self.progress = progress_callback
         self._metadata = defaultdict(dict)
+        self._metadata_order = defaultdict(dict)
 
         self.activate_options = self.config.config.get('activate_options', {})
         ns_sep = self.activate_options.get('namespace_separator', None)
@@ -57,8 +62,8 @@ class Scanner:
         return f"active_id:v1:{metadatatype}:{message}"
 
     def make_active_id(self, metadatatype, identifier: str) -> str:
-        plaintext_id = f"{self.active_id_namespace}{self.namespace_separator}{identifier}".encode("utf-8")
-        message = self.hashing_method(plaintext_id).hexdigest()
+        plaintext_id = f"{self.active_id_namespace}{self.namespace_separator}{identifier}"
+        message = self.hashing_method(plaintext_id.encode("utf-8")).hexdigest()
         active_id = f"active_id:v1:{metadatatype}:{message}"
         if self.output_plaintext_with_hash:
             active_id = f"{active_id}#{plaintext_id}"
@@ -104,19 +109,89 @@ class Scanner:
         #     "glossary_item": {},
         #     "data_element": {},
         # }
+        self._metadata_order[item_type][active_id] = 0
         self._metadata[item_type][active_id] = item
 
-    def upsert_metadata(self, item_type, active_id, item={}):
-        if active_id not in self._metadata[item_type].keys():
-            self._metadata[item_type][active_id] = item
+    def upsert_metadata(self, item_type, active_id, item={}, order_hint=None):
+        if item.get('uuid', None) is None:
+            item['uuid'] = active_id
         
-    def append_metadata_field(self, item_type, active_id, field, value):
+        if order_hint is not None:
+            self._metadata_order[item_type][active_id] = order_hint
+
+        if active_id not in self._metadata[item_type].keys():
+            self.add_metadata(item_type, active_id, item)
+        
+    def append_metadata_component(self, item_type, active_id, component_name, component, with_order=False):
         self.upsert_metadata(item_type, active_id)
-        self._metadata[item_type][active_id].setdefault(field, [])
-        self._metadata[item_type][active_id][field].append(value)
+
+        item = self._metadata[item_type][active_id]
+
+        if component_name == "datasetdistributiongroup_set.datasetdistributionpath_set":
+            if item.get('datasetdistributiongroup_set', None) is None:
+                item['datasetdistributiongroup_set'] = {
+                "name": "Root",
+                "order": 0,
+                "datasetdistributionpath_set": [],
+            }
+            components = item['datasetdistributiongroup_set']['datasetdistributionpath_set']
+        elif component_name == "datasetdistributiongroup_set.datasetdatasetpath_set":
+            if item.get('datasetdistributiongroup_set', None) is None:
+                item['datasetdistributiongroup_set'] = {
+                "name": "Root",
+                "order": 0,
+                "datasetdistributionpath_set": [],
+                "datasetdatasetpath_set": [],
+            }
+            components = item['datasetdistributiongroup_set']['datasetdatasetpath_set']
+        else:
+            self._metadata[item_type][active_id].setdefault(component_name, [])
+            components = self._metadata[item_type][active_id][component_name]
+
+        if with_order:
+            component['order'] = len(components)
+
+        components.append(component)
+
 
     def scan_metadata(self):
         self.scan_datasets()
+
+    def metadata_as_dict(self):
+        output = {}
+        for item_type, item_dict in self._metadata.items():
+            def order_hint(item):
+                return self._metadata_order[item_type].get(item['uuid'], 0)
+
+            output[item_type] = sorted(
+                item_dict.values(),
+                key=order_hint
+            )  
+        return output
+
+    def metadata_as_ordered_dict(self):
+        output = {}
+        for md_type, order_hints in self._metadata_order.items():
+            output[md_type] = {}
+            for item_id, hint in order_hints.items():
+                output[md_type].setdefault(hint, [])
+                output[md_type][hint].append(self._metadata[md_type][item_id])
+            
+        return output
+        
+    def field_to_aristotle_component(self, item, component_name, component):
+        component = []
+
+        if component_name == "datasetdistributiongroup_set":
+            if item.get('datasetdistributiongroup_set', None) is None:
+                item['datasetdistributiongroup_set'] = {
+                "name": "Root",
+                "order": 0,
+                "datasetdistributionpath_set": [],
+            }
+            components = item['datasetdistributiongroup_set']['datasetdistributionpath_set']
+
+        components.append(component)
 
     def field_to_aristotle(self, conf, source):
         """
@@ -150,6 +225,9 @@ class Scanner:
         if type(conf) is list:
             pass
         elif type(conf) is dict:
+            if 'type' not in conf.keys():
+                raise ConfigError(f"Field configuration must have a type: {conf}")
+
             if conf['type'] == 'concat':
                 values = []
                 for inner_conf in conf['values']:
@@ -180,6 +258,8 @@ class Scanner:
                     final_value = str(bbox_coords)
                 else:
                     final_value = OMIT_FIELD
+            elif conf['type'] == 'active_id':
+                final_value = self.spec_to_active_id(conf['metadata_type'], conf['active_id'], source)
             elif conf['type'] == 'join':
                 values = source.get(conf['field'], [])
                 separator = conf.get('separator', '')

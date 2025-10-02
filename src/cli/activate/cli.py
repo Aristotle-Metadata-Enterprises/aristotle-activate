@@ -13,37 +13,56 @@ from activate.utils.progress import ProgressReporter
 @click.option("-o", "--output-file", type=click.File("w"), help="Path to a file to save generated metadata")
 @click.option("-U", "--upload", is_flag=True, show_default=True, default=False, help="Send generated metadata to a configured server")
 @click.option("-S", "--show", is_flag=True, show_default=True, default=False, help="Send generated metadata to terminal (STDOUT)")
-@click.option("-T", "--api-token", type=click.STRING, help="Optional API Token. This will override a token set in the configuration file")
-def activate_cli(config, output_file, upload, show, api_token):
+@click.option("-T", "--api-token", type=click.STRING, help="Optional API Token. This will override a token specified in the configuration file")
+@click.option("-R", "--registry_url", type=click.STRING, help="Registry for upload. This will override a registry specified in the configuration file")
+@click.option("-P", "--pipeline_uuid", type=click.STRING, help="Pipeline UUID to feed into. This will override a pipeline specified in the configuration file")
+@click.option("-O", "--ordered", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by order hints. Only valid for output file (-o) or show (-S)")
+def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, ordered):
     configfile = config
 
     # Change working directory to config file
     # This is mostly necessary for sqllite database files in testing.
     os.chdir(os.path.dirname(config.name))
 
-    config = Config.prepare_from_stream(config)
-    data = activate_metadata(config, configfile.name)
+    registry_cli = {}
+    if registry_url:
+        registry_cli['url'] = registry_url
+    if api_token:
+        registry_cli['api_token'] = api_token
+    if pipeline_uuid:
+        registry_cli['pipeline'] = pipeline_uuid
+
+    config = Config.prepare_from_stream(config, registry_cli=registry_cli)
+    scanner = activate_metadata(config, configfile.name)
+    if ordered:
+        data = scanner.metadata_as_ordered_dict()
+    else:
+        data = scanner.metadata_as_dict()
 
     if output_file:
-        yaml.dump(data, output_file)
+        # yaml.dump(data, output_file)
+        json.dump(data,  output_file, indent=4)
         click.echo(
             f"Activate scan complete. Results stored in {output_file.name}"
         )
     if show:
         import pprint
-        click.echo(pprint.pformat(data))
+        click.echo("Printing to STDOUT")
+        click.echo(json.dumps(data, indent=4))
     if upload:
         click.echo(f"Sending results to {config.config['registry']['url']}")
-        pipeline, response = config.registry.send_payload(data)
+        for status in config.registry.send_as_chunked_payloads(scanner):
+            pipeline, response = status
+            # continue
 
-        if response.status_code == 201:
-            if pipeline:
-                click.echo(f'The payload has been sent to pipeline {pipeline}')
+            if response.status_code == 201:
+                if pipeline:
+                    click.echo(f'The payload has been sent to pipeline {pipeline}')
+                else:
+                    click.echo('The following item uuids have been activated.')
+                    click.echo(json.loads(response.content))
             else:
-                click.echo('The following item uuids have been activated.')
-                click.echo(json.loads(response.content))
-        else:
-            click.echo(f'Failed to activate items: {json.loads(response.content)}')
+                click.echo(f'Failed to activate items: \n\n {response.content}')
 
 
 def get_scanner(configfilename):
@@ -57,9 +76,9 @@ def activate_metadata(config, configfilename):
     click.echo("Scanning schemas")
     with click.progressbar(label="Scanning:", length=100) as bar:
         scanner = Scanner.from_config(config, progress_callback=ClickProgress(bar))
-        data = scanner.scan_datasets()
+        metadata = scanner.scan_metadata()
 
-    return data
+    return scanner
 
 
 class ClickProgress(ProgressReporter):

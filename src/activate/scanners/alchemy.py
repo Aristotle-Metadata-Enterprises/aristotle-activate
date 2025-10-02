@@ -61,12 +61,6 @@ class AlchemyScanner(Scanner):
             self.add_metadata("dataset", dataset["uuid"], dataset)
 
         self.progress.finish()
-        output = {
-            item_type: list(item_dict.values())
-            for item_type, item_dict in self._metadata.items()
-        }
-
-        return output
 
     def scan_dataset(self, schema_name) -> dict:
         """

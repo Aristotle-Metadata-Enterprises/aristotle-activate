@@ -54,8 +54,6 @@ class SCSVScanner(Scanner):
         with open(self.options['file']) as f:
             reader = csv.DictReader(f)
             for i, row in enumerate(csv.DictReader(f)):
-                if i > 10:
-                    break
                 self.row_to_metadata(row)
 
     def row_to_metadata(self, row):
@@ -92,15 +90,3 @@ class SCSVScanner(Scanner):
             
 
         return item
-
-    def spec_to_active_id(self, metadatatype, conf, row):
-        fields = [conf['prefix']]
-        for column in conf['columns']:
-            if field := row.get(column, None):
-                fields.append(field.strip())
-            else:
-                return None
-        identifier = '+'.join(fields)
-        return self.make_active_id(metadatatype, identifier)
-
-

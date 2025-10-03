@@ -1,6 +1,6 @@
 import yaml
 import typing
-from activate.utils.exceptions import ConfigError
+from activate.utils.exceptions import ActivateConfigError
 from activate.utils.registry import Registry
 
 def reader(stream: typing.IO) -> dict:
@@ -10,20 +10,22 @@ def reader(stream: typing.IO) -> dict:
     try:
         return yaml.safe_load(stream)
     except yaml.YAMLError as exc:
-        raise ConfigError("Unable to read config steam or file")
+        raise ActivateConfigError("Unable to read config steam or file")
+
+
+class ConfigurationError(Exception):
+    pass
 
 
 class Config:
     def __init__(self, config: dict, registry_cli):
         self.config = config
         registry_args = config.get('registry', {})
-        print(f"{registry_args}")
-        print(f"{registry_cli}")
+        if 'api_token' in registry_args:
+            raise ActivateConfigError("api_token cannot be set in config file, use --api-token argument or ACTIVATE_API_TOKEN environment variable")
         if registry_cli:
             registry_args.update(registry_cli)
-        print(f"{registry_args}")
         self.registry = Registry(**registry_args)
-        print(f"{self.registry.pipeline=}")
 
     @classmethod
     def prepare_from_filename(cls, filename: str):

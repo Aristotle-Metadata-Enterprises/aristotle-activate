@@ -2,7 +2,7 @@ import hashlib
 from importlib import import_module
 from collections import defaultdict
 from sqlalchemy.ext.automap import automap_base
-from activate.utils.exceptions import ConfigError
+from activate.utils.exceptions import ActivateConfigError
 from activate.utils.loaddb import prepare_engine
 from activate.utils.progress import NullProgressReporter
 
@@ -13,9 +13,6 @@ scanners_register = {
 def register(scanner_class):
     scanners_register[scanner_class.name] = scanner_class
 
-
-class ConfigError(Exception):
-    pass
 
 # We can't use truthiness, or None as both of these are valid values which we may want to retain and pass through.
 VALUE_NOT_SET = "This value has not been set"
@@ -94,12 +91,12 @@ class Scanner:
             return Scanner(config, progress_callback)
         except:
             raise
-            raise ConfigError(f"Connection type '{con_type}' not supported")
+            raise ActivateConfigError(f"Connection type '{con_type}' not supported")
 
         if con_type == "database":
             return AlchemyScanner(config, progress_callback)
 
-        raise ConfigError(f"Connection type '{con_type}' not supported")
+        raise ActivateConfigError(f"Connection type '{con_type}' not supported")
 
     def add_metadata(self, item_type, active_id, item):
         # metadata = {
@@ -109,15 +106,25 @@ class Scanner:
         #     "glossary_item": {},
         #     "data_element": {},
         # }
-        self._metadata_order[item_type][active_id] = 0
+        self.setdefault_metadata_order(item_type, active_id, 0)
         self._metadata[item_type][active_id] = item
+
+    def setdefault_metadata_order(self, item_type, active_id, order_hint=0):
+        if active_id not in self._metadata_order[item_type].keys():
+            self._metadata_order[item_type][active_id] = order_hint
+
+    def upsert_metadata_order(self, item_type, active_id, order_hint):
+        self._metadata_order[item_type][active_id] = order_hint
 
     def upsert_metadata(self, item_type, active_id, item={}, order_hint=None):
         if item.get('uuid', None) is None:
-            item['uuid'] = active_id
+            if active_id is not None:
+                item['uuid'] = active_id
+            else:
+                return
         
         if order_hint is not None:
-            self._metadata_order[item_type][active_id] = order_hint
+            self.upsert_metadata_order(item_type, active_id, order_hint)
 
         if active_id not in self._metadata[item_type].keys():
             self.add_metadata(item_type, active_id, item)
@@ -226,7 +233,7 @@ class Scanner:
             pass
         elif type(conf) is dict:
             if 'type' not in conf.keys():
-                raise ConfigError(f"Field configuration must have a type: {conf}")
+                raise ActivateConfigError(f"Field configuration must have a type: {conf}")
 
             if conf['type'] == 'concat':
                 values = []
@@ -286,3 +293,14 @@ class Scanner:
         if final_value == VALUE_NOT_SET:
             final_value = default_value
         return final_value
+
+    def spec_to_active_id(self, metadatatype, conf, row):
+        fields = [conf['prefix']]
+        for column in conf['columns']:
+            if field := row.get(column, None):
+                fields.append(field.strip())
+            else:
+                return None
+        identifier = '+'.join(fields)
+        return self.make_active_id(metadatatype, identifier)
+

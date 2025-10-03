@@ -4,7 +4,7 @@ import uuid
 import json
 
 
-MAX_ITEMS_PER_PAYLOAD = 150
+MAX_ITEMS_PER_PAYLOAD = 75
 MAX_PAYLOAD_SIZE_IN_BYTES = 2 * 1024 * 1024  # 2MB
 
 
@@ -48,7 +48,7 @@ class Registry:
         )
         return self.pipeline, response
 
-    def send_as_chunked_payloads(self, scanner):
+    def send_as_chunked_payloads(self, scanner, metadata_types_to_send=None):
 
         send_order = [
             'datatype',
@@ -57,9 +57,17 @@ class Registry:
             'dataset',
         ]
 
+        if not metadata_types_to_send:
+            metadata_types_to_send = send_order
+        else:
+            metadata_types_to_send = [
+                md_type for md_type in send_order
+                if md_type in metadata_types_to_send
+            ]
+
         metadata = scanner.metadata_as_ordered_dict()
 
-        for md_type in send_order:
+        for md_type in metadata_types_to_send:
             for order, ordered_sets in metadata.get(md_type,{}).items():
                 for chunk_number, items in self.create_metadata_for_payload(ordered_sets):
                     json_data = {

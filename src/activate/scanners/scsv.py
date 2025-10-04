@@ -13,26 +13,6 @@ from datetime import datetime
 import csv
 
 
-def pwint(*vals):
-    return
-    import inspect, ast
-    frame = inspect.currentframe().f_back
-    call_line = inspect.getframeinfo(frame).code_context[0].strip()
-    tree = ast.parse(call_line)
-    call = tree.body[0].value
-    names = []
-    for arg in call.args:
-        if isinstance(arg, ast.Name):
-            names.append(arg.id)
-        else:
-            # fallback: dump raw source for expr
-            names.append(ast.unparse(arg))
-    print(", ".join([
-        f"{n}={v!r}"
-        for n, v in zip(names, vals)
-    ]))
-
-
 class SCSVScanner(Scanner):
     name = "scsv"
 
@@ -59,9 +39,7 @@ class SCSVScanner(Scanner):
     def row_to_metadata(self, row):
         for md_conf in self.options.get('metadata_types', []):
             md_type = md_conf['metadata_type']
-            pwint(md_type, md_conf['details'])
             active_id = self.spec_to_active_id(md_type, md_conf['active_id'], row)
-            pwint(active_id)
             item = self.conf_to_item(md_conf, row)
 
     def conf_to_item(self, conf, row):

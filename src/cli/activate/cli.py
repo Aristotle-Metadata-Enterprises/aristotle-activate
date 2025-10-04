@@ -18,9 +18,10 @@ from activate.utils.progress import ProgressReporter
 @click.option("-T", "--api-token", type=click.STRING, help="API Token. This can alternatively be set with the ACTIVATE_API_TOKEN environment variable. This will override a token specified in the configuration file")
 @click.option("-R", "--registry_url", type=click.STRING, help="Registry for upload. This will override a registry specified in the configuration file")
 @click.option("-P", "--pipeline_uuid", type=click.STRING, help="Pipeline UUID to feed into. This will override a pipeline specified in the configuration file")
-@click.option("-O", "--ordered", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by order hints. Only valid for output file (-o) or show (-S)")
+@click.option("-p", "--priority", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by priority hints. Only valid for output file (-o) or show (-S)")
 @click.option("--metadata-types", type=click.STRING, default=None, help="Only send the specified metadata types. Comma separated list. If not set all types are sent. Only recommended for resending errored loads.")
-def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, ordered, metadata_types):
+@click.option("--disable-ssl-verification", is_flag=True, show_default=True, default=False, help="Disable SSL certificate verification. This is only recommended for testing or debug purposes.")
+def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, priority, metadata_types, disable_ssl_verification):
     configfile = config
 
     # Change working directory to config file
@@ -30,13 +31,14 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
     registry_details = {}
     if registry_url:
         registry_details['url'] = registry_url
-
+    if disable_ssl_verification:
+        registry_details['disable_ssl_verification'] = True
     if api_token:
         registry_details['api_token'] = api_token
     elif env_api_token := os.environ.get("ACTIVATE_API_TOKEN", None):
         registry_details['api_token'] = env_api_token
     else:
-        raise click.ClickException("1 API token not provided. Set --api-token or ACTIVATE_API_TOKEN environment variable.")
+        raise click.ClickException("API token not provided. Set --api-token or ACTIVATE_API_TOKEN environment variable.")
         
     if pipeline_uuid:
         registry_details['pipeline'] = pipeline_uuid
@@ -47,8 +49,8 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
     except ActivateConfigError as e:
         raise click.ClickException(f"Failed to prepare configuration or scan metadata: {e}")
 
-    if ordered:
-        data = scanner.metadata_as_ordered_dict()
+    if priority:
+        data = scanner.metadata_as_priority_dict()
     else:
         data = scanner.metadata_as_dict()
 
@@ -69,21 +71,39 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
             metadata_types_to_send = metadata_types.split(",")
         else:
             metadata_types_to_send = None
+
+        number_of_errors = 0
+
+        disable_ssl_verification
+
+        if disable_ssl_verification:
+            click.echo(f"Alert: SSL certification verification is DISABLED")
+
         for status in config.registry.send_as_chunked_payloads(
             scanner,
             metadata_types_to_send=metadata_types_to_send
         ):
-            pipeline, response = status
-            # continue
-
+            response = status['response']
+            total_chunks = 0
+            total_items_to_send = status['total_items_to_send']
+            items_sent = status['items_sent']
+            current_progress = 100 * (items_sent - status['items_in_chunk']) // total_items_to_send
+            assumed_progress = 100 * items_sent // total_items_to_send
+            
+            click.echo('{progress:4d}% - Sending Chunk #{chunk_number} - {items_in_chunk} of {total_items_in_priority} {metadata_type}(s) with priority {priority}'.format(progress=current_progress, **status))
             if response.status_code == 201:
-                if pipeline:
-                    click.echo(f'The payload has been sent to pipeline {pipeline}')
-                else:
-                    click.echo('The following item uuids have been activated.')
-                    click.echo(json.loads(response.content))
+                click.echo('    OK')
+                click.echo('{progress:4d}% - Sent {items_sent} of {total_items_to_send} total'.format(progress=assumed_progress, **status))
             else:
-                click.echo(f'Failed to activate items: \n\n {response.content}')
+                number_of_errors += 1
+                error = response.content[:50]
+                if len(response.content) > 50:
+                    error += '...'
+                click.echo('Failed to sent payload - {description}: Error: {response.status_code} - {error}'.format(error=error, **status))
+
+        click.echo('Upload complete. Status')
+        click.echo('  - Sent {items_sent} of {total_items_to_send} metadata items'.format(**status))
+        click.echo('  - Uploaded {chunks_sent} chunks/payloads - {number_of_errors} errors encountered'.format(number_of_errors=number_of_errors, **status))
 
 
 def get_scanner(configfilename):

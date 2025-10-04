@@ -109,6 +109,17 @@ class Scanner:
         self.setdefault_metadata_order(item_type, active_id, 0)
         self._metadata[item_type][active_id] = item
 
+    def metadata_count(self, metadata_type=None):
+        if metadata_type is None:
+            return sum([len(v) for v in self._metadata.values()])
+        elif type(metadata_type) is str:
+            return len(self._metadata[metadata_type])
+        else:
+            return sum([
+                len(v) for k,v in self._metadata.items()
+                if k in metadata_type
+            ])
+
     def setdefault_metadata_order(self, item_type, active_id, order_hint=0):
         if active_id not in self._metadata_order[item_type].keys():
             self._metadata_order[item_type][active_id] = order_hint
@@ -176,7 +187,7 @@ class Scanner:
             )  
         return output
 
-    def metadata_as_ordered_dict(self):
+    def metadata_as_priority_dict(self):
         output = {}
         for md_type, order_hints in self._metadata_order.items():
             output[md_type] = {}

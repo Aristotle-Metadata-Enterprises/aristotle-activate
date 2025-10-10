@@ -5,72 +5,30 @@ Activate scanner
 Scans an SQLAlchemy metadata object and finds all tables, views, etc and builds a dictionary from them.
 
 """
-import hashlib
-from collections import defaultdict
+
+from activate.scanners.base import Scanner
+from activate.utils.config import Config
+
 from sqlalchemy.ext.automap import automap_base
-from activate.utils.exceptions import ConfigError
-from activate.utils.loaddb import prepare_engine
-from activate.utils.progress import NullProgressReporter
+from sqlalchemy.orm import Session
+from sqlalchemy import inspect, create_engine
 
 
-class Scanner:
-    def __init__(self, config, progress_callback=NullProgressReporter()):
-        self.config = config
-        self.progress = progress_callback
-        self._metadata = defaultdict(dict)
+def prepare_engine(config: Config):
+    Base = automap_base()
 
-    def scan_datasets(self):
-        raise NotImplementedError
+    # engine, suppose it has two tables 'user' and 'address' set up
+    engine = create_engine(config.config["connector"]["options"]["database_url"])
 
-    def scan_distributions(self):
-        raise NotImplementedError
-
-    @property
-    def active_id_namespace(self: str) -> str:
-        raise NotImplementedError
-
-    def make_constant_ns_id(self, metadatatype: str, identifier: str) -> str:
-        message = hashlib.sha256(
-            f"ARISTOTLE_ACTIVATE_NAMESPACE::{metadatatype}::{identifier}".encode("utf-8")
-        ).hexdigest()
-        # message = f"{self.active_id_namespace}::{identifier}"
-        return f"activate_id:v1:{message}"
-
-    def make_active_id(self, identifier: str) -> str:
-        message = hashlib.sha256(
-            f"{self.active_id_namespace}::{identifier}".encode("utf-8")
-        ).hexdigest()
-        # message = f"{self.active_id_namespace}::{identifier}"
-        return f"activate_id:v1:{message}"
-
-    def make_active_column_id(self, identifier: str, column_name: str) -> str:
-        message = hashlib.sha256(
-            f"{self.active_id_namespace}::{identifier}".encode("utf-8")
-        ).hexdigest()
-        # message = f"{self.active_id_namespace}::{identifier}"
-        return f"activate_column_id:v1:{message}:{column_name}"
-
-    @classmethod
-    def from_config(cls, config, progress_callback=NullProgressReporter()):
-        con_type = config.config["connector"]["type"]
-
-        if con_type == "database":
-            return AlchemyScanner(config, progress_callback)
-
-        raise ConfigError(f"Connection type '{con_type}' not supported")
-
-    def add_metadata(self, item_type, active_id, item):
-        # metadata = {
-        #     "dataset": {},
-        #     "distribution": {},
-        #     "value_domain": {},
-        #     "glossary_item": {},
-        #     "data_element": {},
-        # }
-        self._metadata[item_type][active_id] = item
+    # reflect the tables
+    Base.prepare(autoload_with=engine)
+    # return Base
+    return inspect(engine)
 
 
 class AlchemyScanner(Scanner):
+    name = "alchemy"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.inspector = prepare_engine(self.config)
@@ -86,7 +44,7 @@ class AlchemyScanner(Scanner):
     @property
     def active_id_namespace(self):
         """
-        Only return the safe parts of the databse url for the namespace
+        Only return the safe parts of the database url for the namespace
         """
         url = self.engine.url
         namespace = f"{url.drivername}://{url.host}:{url.port}/{url.database}"
@@ -103,12 +61,6 @@ class AlchemyScanner(Scanner):
             self.add_metadata("dataset", dataset["uuid"], dataset)
 
         self.progress.finish()
-        output = {
-            item_type: list(item_dict.values())
-            for item_type, item_dict in self._metadata.items()
-        }
-
-        return output
 
     def scan_dataset(self, schema_name) -> dict:
         """
@@ -116,7 +68,7 @@ class AlchemyScanner(Scanner):
         """
 
         dataset = {
-            "uuid": self.make_active_id(schema_name),
+            "uuid": self.make_active_id('dataset', schema_name),
             "name": schema_name,
             "datasetdistributionpath_set": [],
         }
@@ -126,10 +78,15 @@ class AlchemyScanner(Scanner):
                 distribution = self.scan_distribution(schema_name, table)
                 self.add_metadata("distribution", distribution["uuid"], distribution)
 
+                dataset_dist_id = self.make_active_table_link_id(table)
                 dataset["datasetdistributionpath_set"].append(
                     {
+                        "activate": {
+                            "id": dataset_dist_id,
+                        },
+                        "id": dataset_dist_id,
                         "order": i,
-                        "uuid": distribution["uuid"],
+                        "distribution": distribution["uuid"],
                     }
                 )
                 self.progress.add(100 / self.number_of_tables)
@@ -143,7 +100,7 @@ class AlchemyScanner(Scanner):
 
         table = self.metadata.tables[table_name]
         dist = {
-            "uuid": self.make_active_id(table.fullname),
+            "uuid": self.make_active_id('distribution', table.fullname),
             "name": str(table.name),
             # "updated_date": NOW
             "format_type": self.engine.name,    
@@ -163,7 +120,7 @@ class AlchemyScanner(Scanner):
             active_value_domain = {
                 "name": type_name,
                 "definition": f"An SQL primative datatype of type {type_name}",
-                "datatype": active_datatype['uuid']
+                "data_type": active_datatype['uuid']
             }
             if hasattr(column.type, 'length'):
                 active_value_domain['name'] = f"{type_name}({column.type.length})"
@@ -180,18 +137,21 @@ class AlchemyScanner(Scanner):
                         fkey.column.name
                     )
 
+            path_id = self.make_active_column_id(table.name, column.name)
             col_data = {
+                # Active content
+                "activate": {
+                    "id": path_id,
+                    "active_datatype": active_datatype['uuid'],
+                    "primary_key": column.primary_key,
+                    "nullable": column.nullable,
+                    "foreign_key": foreign_key,
+                },
+                "id": path_id,
                 "order": i,
                 "logical_path": str(column.name),
-
                 #TODO: Change to accept VD or Glossary Item as well as data_element
-                "metadata": active_value_domain['uuid'],
-
-                # Active content
-                "primary_key": column.primary_key,
-                "active_datatype": active_datatype['uuid'],
-                "nullable": column.nullable,
-                "foreign_key": foreign_key,
+                # "metadata": active_value_domain['uuid'],
             }
 
             dist["distributiondataelementpath_set"].append(col_data)

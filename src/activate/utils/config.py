@@ -1,6 +1,6 @@
 import yaml
 import typing
-from activate.utils.exceptions import ConfigError
+from activate.utils.exceptions import ActivateConfigError
 from activate.utils.registry import Registry
 
 def reader(stream: typing.IO) -> dict:
@@ -10,13 +10,22 @@ def reader(stream: typing.IO) -> dict:
     try:
         return yaml.safe_load(stream)
     except yaml.YAMLError as exc:
-        raise ConfigError("Unable to read config steam or file")
+        raise ActivateConfigError("Unable to read config steam or file")
+
+
+class ConfigurationError(Exception):
+    pass
 
 
 class Config:
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, registry_cli):
         self.config = config
-        self.registry = Registry(**config['registry'])
+        registry_args = config.get('registry', {})
+        if 'api_token' in registry_args:
+            raise ActivateConfigError("api_token cannot be set in config file, use --api-token argument or ACTIVATE_API_TOKEN environment variable")
+        if registry_cli:
+            registry_args.update(registry_cli)
+        self.registry = Registry(**registry_args)
 
     @classmethod
     def prepare_from_filename(cls, filename: str):
@@ -24,8 +33,8 @@ class Config:
             return cls.prepare_from_stream(stream)
 
     @classmethod
-    def prepare_from_stream(cls, filelike: typing.IO):
-        config = cls(reader(filelike))
+    def prepare_from_stream(cls, filelike: typing.IO, registry_cli: dict = {}):
+        config = cls(reader(filelike), registry_cli)
 
         if config.config["connector"]["type"] == "database":
             db_url = config.config["connector"]["options"]["database_url"]

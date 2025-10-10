@@ -38,10 +38,11 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
 
     if dry_run:
         registry_details['dry_run'] = dry_run
-    if api_token:
-        registry_details['api_token'] = api_token
     if items_per_chunk:
         registry_details['items_per_chunk'] = items_per_chunk
+
+    if api_token:
+        registry_details['api_token'] = api_token
     elif env_api_token := os.environ.get("ACTIVATE_API_TOKEN", None):
         registry_details['api_token'] = env_api_token
     else:

@@ -1,5 +1,5 @@
 """
-Structured CSV scanner
+Metamapper CSV scanner
 ======================
 
 Scans a CSV File and tries to process it into Aristotle things
@@ -13,8 +13,8 @@ from datetime import datetime
 import csv
 
 
-class SCSVScanner(Scanner):
-    name = "scsv"
+class MetaMapperScanner(Scanner):
+    name = "metamapper"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

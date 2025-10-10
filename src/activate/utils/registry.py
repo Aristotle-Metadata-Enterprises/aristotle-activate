@@ -14,6 +14,8 @@ class Registry:
     pipeline: uuid.UUID = None
     api_token: str = ""
     disable_ssl_verification: bool = False
+    items_per_chunk: int = MAX_ITEMS_PER_PAYLOAD
+    dry_run: bool = False
 
     endpoints = {
         "send_payload": "/api/activate/payload",
@@ -43,8 +45,14 @@ class Registry:
             "Authorization": f"Token {token}"
         }
 
+        verify = not self.disable_ssl_verification
+        if self.dry_run:
+            response = requests.models.Response()
+            response.status_code = 201
+            response._content = b'Dry run - not sent'
+            response.url = url
+            return response
         try:
-            verify = not self.disable_ssl_verification
             response = requests.post(
                 url,
                 headers=headers, json=data, verify=verify
@@ -109,6 +117,10 @@ class Registry:
                         'chunks_sent': chunks_sent,
                     }
 
+    @property
+    def chunk_item_size(self):
+        return min(150, self.items_per_chunk)
+
     def create_metadata_for_payload(self, metadata_set):
         items = []
 
@@ -119,7 +131,7 @@ class Registry:
             item_size = len(json.dumps(item).encode('utf-8'))
             payload_too_big = (
                 (chunk_items_size + item_size > MAX_PAYLOAD_SIZE_IN_BYTES) or
-                (items_in_chunk >= MAX_ITEMS_PER_PAYLOAD)
+                (items_in_chunk >= self.chunk_item_size)
             )
             if payload_too_big:
                 yield chunks, items

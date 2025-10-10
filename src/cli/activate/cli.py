@@ -21,7 +21,9 @@ from activate.utils.progress import ProgressReporter
 @click.option("-p", "--priority", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by priority hints. Only valid for output file (-o) or show (-S)")
 @click.option("--metadata-types", type=click.STRING, default=None, help="Only send the specified metadata types. Comma separated list. If not set all types are sent. Only recommended for resending errored loads.")
 @click.option("--disable-ssl-verification", is_flag=True, show_default=True, default=False, help="Disable SSL certificate verification. This is only recommended for testing or debug purposes.")
-def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, priority, metadata_types, disable_ssl_verification):
+@click.option("--items-per-chunk", type=int, help="Override the number of items to send per chunk/payload. Default is 75. Maximum is 150.")
+@click.option("--dry-run", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by priority hints. Only valid for output file (-o) or show (-S)")
+def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, priority, metadata_types, disable_ssl_verification, items_per_chunk, dry_run):
     configfile = config
 
     # Change working directory to config file
@@ -33,8 +35,13 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
         registry_details['url'] = registry_url
     if disable_ssl_verification:
         registry_details['disable_ssl_verification'] = True
+
+    if dry_run:
+        registry_details['dry_run'] = dry_run
     if api_token:
         registry_details['api_token'] = api_token
+    if items_per_chunk:
+        registry_details['items_per_chunk'] = items_per_chunk
     elif env_api_token := os.environ.get("ACTIVATE_API_TOKEN", None):
         registry_details['api_token'] = env_api_token
     else:
@@ -99,7 +106,7 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
                 error = response.content[:50]
                 if len(response.content) > 50:
                     error += '...'
-                click.echo('Failed to sent payload - {description}: Error: {response.status_code} - {error}'.format(error=error, **status))
+                click.echo('Failed to send payload - {description}: Error: {response.status_code} - {error}'.format(error=error, **status))
 
         click.echo('Upload complete. Status')
         click.echo('  - Sent {items_sent} of {total_items_to_send} metadata items'.format(**status))

@@ -46,7 +46,7 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
     elif env_api_token := os.environ.get("ACTIVATE_API_TOKEN", None):
         registry_details['api_token'] = env_api_token
     else:
-        raise click.ClickException("API token not provided. Set --api-token or ACTIVATE_API_TOKEN environment variable.")
+        click.echo("Warning: API token not provided. Unable to send payload. Set --api-token or ACTIVATE_API_TOKEN environment variable.")
         
     if pipeline_uuid:
         registry_details['pipeline'] = pipeline_uuid
@@ -71,10 +71,15 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
     if show:
         click.echo("Printing to STDOUT")
         click.echo(json.dumps(data, indent=4))
+
     if upload:
-        click.echo(f"Sending results to {config.config['registry']['url']}")
-        click.echo(f"Waiting 3 seconds before sending... press Crtl-C to abort...")
-        time.sleep(3)
+        if not config.config.get('registry', None):
+            click.echo("Error: No registry configured. Performing a dry run ONLY.")
+        else:
+            click.echo(f"Sending results to {config.config['registry']['url']}")
+            click.echo(f"Waiting 3 seconds before sending... press Crtl-C to abort...")
+            time.sleep(3)
+
         if metadata_types:
             metadata_types_to_send = metadata_types.split(",")
         else:

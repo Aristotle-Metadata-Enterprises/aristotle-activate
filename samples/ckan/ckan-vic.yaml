@@ -1,0 +1,57 @@
+
+connector:
+  type: activate.scanners.ckan.CKANScanner
+  options:
+    # The database URL of the source system to scan
+    # https://docs.sqlalchemy.org/en/20/core/engines.html
+    ckan_url: "https://discover.data.vic.gov.au/"
+    mapping:
+      dataset:
+        # Map CKAN fields to Aristotle fields
+        name: title
+        definition: notes
+        rights: 
+          type: concat
+          separator: ""
+          values:
+            - type: string
+              value: "<a href='"
+            - type: field
+              field: license_url
+            - type: string
+              value: "'>"
+            - type: field
+              field: license_title
+            - type: string
+              value: "</a>"
+        release_date:
+          type: field
+          field: date_created_data_asset
+        contact_point: 
+          type: field
+          field: maintainer_email
+          default: ""
+          on_null: "set_default"
+        frequency: 
+          type: field
+          field: update_frequency
+        updated_date:
+          type: parse_date
+          field: modified
+          format: "%Y-%m-%d"
+        landing_page: 
+          type: concat
+          separator: ""
+          values:
+            - type: string
+              value: https://discover.data.vic.gov.au/data/
+            - type: field
+              field: id
+
+    search:
+      # Optional search parameters to filter datasets from CKAN
+      # See https://docs.ckan.org/en/2.9/api/#ckan.logic.action.get.package_search
+      # q: "organization:pacific-data"
+      rows: 50 # Number of datasets to retrieve per request
+      fq: "organization:department-of-education"
+      sort: metadata_modified desc

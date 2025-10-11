@@ -1,0 +1,12 @@
+
+connector:
+  type: activate.scanners.alchemy.AlchemyScanner
+  options:
+    # The database URL of the source system to scan
+    # https://docs.sqlalchemy.org/en/20/core/engines.html
+    database_url: "sqlite:///./chinook.db"
+
+  # Future types
+  # type: airtable: https://airtable.com/developers/web/api/list-bases
+  # type: excel
+  # type: snowflake? If we don't connect with sqlalchemy

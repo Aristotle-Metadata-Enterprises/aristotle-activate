@@ -10,7 +10,7 @@ MAX_PAYLOAD_SIZE_IN_BYTES = 2 * 1024 * 1024  # 2MB
 
 @dataclass
 class Registry:
-    url: str
+    url: str = None
     pipeline: uuid.UUID = None
     api_token: str = ""
     disable_ssl_verification: bool = False
@@ -34,6 +34,10 @@ class Registry:
         return ""
 
     def send_payload(self, data):
+        if not self.url:
+            self.url = "activate://dry-run.example.com"
+            self.dry_run = True
+
         if self.pipeline:
             url = self.endpoint("send_payload_to_pipeline")
         else:
@@ -134,6 +138,8 @@ class Registry:
                 (items_in_chunk >= self.chunk_item_size)
             )
             if payload_too_big:
+                # If the payload is too big, yield the result so it can be sent
+                # Then we reset everything
                 yield chunks, items
                 items = []
                 chunk_items_size = 0
@@ -141,9 +147,8 @@ class Registry:
                 chunks += 1
             else:
                 # If the payload is not too big, just continue
-                # If the payload is too big, we reset everything
                 # This else is just for clarity to show that either way
-                # we need to append the item to the current chunk or the new one.
+                # we need to append the current item to the current chunk or the new one.
                 pass
                 
             

@@ -115,27 +115,3 @@ connector:
       rows: 100 # Number of datasets to retrieve per request
       fq: "dataset AND temporal_start:[1900-01-01T00:00:00Z TO *]"
       sort: metadata_modified desc
-
-# The name for the system to scan - this will not over ride contents within Aristotle
-# Is this required? Yes - on the first pass at least
-name: "CKAN Test"
-
-registry:
-  url: https://spc.aristotlecloud.io/
-  api_token: d2748e6174ce37791ac4e683b5ececc2f556e98c
-  pipeline: d6f0858e-8ec1-11f0-97f8-0a58a9feac02
-
-scan-options:
-  # 
-  object_types:
-    # - schemas
-    - tables
-    - columns
-    # - views
-
-  # list of tables to include?
-  # include: []
-
-
-  # A list of tables (or table like objects to exclude from scanning)?
-  # exclude: []

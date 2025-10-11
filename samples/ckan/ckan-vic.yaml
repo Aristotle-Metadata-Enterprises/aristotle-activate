@@ -55,27 +55,3 @@ connector:
       rows: 50 # Number of datasets to retrieve per request
       fq: "organization:department-of-education"
       sort: metadata_modified desc
-
-# The name for the system to scan - this will not over ride contents within Aristotle
-# Is this required? Yes - on the first pass at least
-name: "CKAN Test"
-
-registry:
-  url: https://vic-edu-evaluation.aristotlecloud.io/
-  api_token: 6d965d6b24c1dddd0c0a08e51e67c5c8b7a9a3e4
-  pipeline: 2d32c2c8-92c2-11f0-8a82-0a58a9feac02
-
-scan-options:
-  # 
-  object_types:
-    # - schemas
-    - tables
-    - columns
-    # - views
-
-  # list of tables to include?
-  # include: []
-
-
-  # A list of tables (or table like objects to exclude from scanning)?
-  # exclude: []

@@ -1,0 +1,8 @@
+
+connector:
+  type: activate.scanners.dotstat.DotStatScanner
+  options:
+    dotstat_api_url: "https://data-sdmx-disseminate.statsfiji.gov.fj"
+    dotstat_url: https://data.statsfiji.gov.fj/
+    # dotstat_api_url: "https://stats-nsi-stable.pacificdata.org"
+    # dotstat_url: "https://stats.pacificdata.org"

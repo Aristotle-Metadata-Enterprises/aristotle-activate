@@ -27,7 +27,7 @@ class MetaMapperScanner(Scanner):
         """
         return self.options.get('prefix', "")
 
-    def scan_metadata(self):
+    async def scan_metadata(self):
         return self.scan_rows()
 
     def scan_rows(self):

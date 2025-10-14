@@ -3,6 +3,7 @@ import yaml
 import click
 import json
 import time
+import asyncio
 
 from activate.utils.config import Config
 from activate.utils.exceptions import ActivateConfigError
@@ -23,7 +24,8 @@ from activate.utils.progress import ProgressReporter
 @click.option("--disable-ssl-verification", is_flag=True, show_default=True, default=False, help="Disable SSL certificate verification. This is only recommended for testing or debug purposes.")
 @click.option("--items-per-chunk", type=int, help="Override the number of items to send per chunk/payload. Default is 75. Maximum is 150.")
 @click.option("--dry-run", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by priority hints. Only valid for output file (-o) or show (-S)")
-def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, priority, metadata_types, disable_ssl_verification, items_per_chunk, dry_run):
+@click.option("--scarg", "scargs", multiple=True, type=click.STRING, help="Optional list of (S)ecret (C)onfig (arg)uments for the given scanner")
+def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, priority, metadata_types, disable_ssl_verification, items_per_chunk, dry_run, scargs):
     configfile = config
 
     # Change working directory to config file
@@ -51,10 +53,19 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
     if pipeline_uuid:
         registry_details['pipeline'] = pipeline_uuid
 
+    scargs_dict = {}
+    for scarg in scargs:
+        if '::' not in scarg:
+            raise click.ClickException(f"Invalid scanner config argument (scarg) '{scarg}'. Must be in the form key::value")
+        key, value = scarg.split('::', 1)
+        scargs_dict[key] = value
+
     try:
         config = Config.prepare_from_stream(config, registry_cli=registry_details)
-        scanner = activate_metadata(config, configfile.name)
+        scanner = Scanner.from_config(config, secret_args=scargs_dict)
+        scanner = activate_metadata(scanner)
     except ActivateConfigError as e:
+        raise
         raise click.ClickException(f"Failed to prepare configuration or scan metadata: {e}")
 
     if priority:
@@ -126,11 +137,11 @@ def get_scanner(configfilename):
     return scanner
 
 
-def activate_metadata(config, configfilename):
+def activate_metadata(scanner):
     click.echo("Scanning schemas")
     with click.progressbar(label="Scanning:", length=100) as bar:
-        scanner = Scanner.from_config(config, progress_callback=ClickProgress(bar))
-        metadata = scanner.scan_metadata()
+        scanner.progress_callback = ClickProgress(bar)
+        metadata = asyncio.run(scanner.scan_metadata())
 
     return scanner
 

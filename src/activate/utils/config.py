@@ -18,7 +18,7 @@ class ConfigurationError(Exception):
 
 
 class Config:
-    def __init__(self, config: dict, registry_cli):
+    def __init__(self, config: dict, registry_cli, secure_args):
         self.config = config
         registry_args = config.get('registry', {})
         if 'api_token' in registry_args:
@@ -26,6 +26,7 @@ class Config:
         if registry_cli:
             registry_args.update(registry_cli)
         self.registry = Registry(**registry_args)
+        self.secure_args = secure_args
 
     @classmethod
     def prepare_from_filename(cls, filename: str):
@@ -33,8 +34,8 @@ class Config:
             return cls.prepare_from_stream(stream)
 
     @classmethod
-    def prepare_from_stream(cls, filelike: typing.IO, registry_cli: dict = {}):
-        config = cls(reader(filelike), registry_cli)
+    def prepare_from_stream(cls, filelike: typing.IO, registry_cli: dict = {}, secure_args: dict = {}):
+        config = cls(reader(filelike), registry_cli, secure_args)
 
         if config.config["connector"]["type"] == "database":
             db_url = config.config["connector"]["options"]["database_url"]

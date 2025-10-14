@@ -22,8 +22,10 @@ OMIT_FIELD = "This field should be omitted"
 class Scanner:
     namespace_separator = "::"
     hashing_method = hashlib.sha256
+    required_secret_args = []
+    secret_args = {}
 
-    def __init__(self, config, progress_callback=NullProgressReporter()):
+    def __init__(self, config, secret_args={}, progress_callback=NullProgressReporter()):
         self.config = config
         self.progress = progress_callback
         self._metadata = defaultdict(dict)
@@ -41,6 +43,11 @@ class Scanner:
             if hash_method == 'plaintext':
                 self.hashing_method = lambda plaintext: plaintext
         self.output_plaintext_with_hash = bool(self.activate_options.get('output_plaintext_with_hash', False))
+
+        for secret_arg_name in self.required_secret_args:
+            if secret_arg_name not in secret_args.keys():
+                raise ActivateConfigError(f"Missing required secret argument '{secret_arg_name}' for scanner")
+        self.secret_args = secret_args
 
     def scan_datasets(self):
         raise NotImplementedError
@@ -79,7 +86,7 @@ class Scanner:
         return f"active_id:v1:dataset_distribution:{message}"
 
     @classmethod
-    def from_config(cls, config, progress_callback=NullProgressReporter()):
+    def from_config(cls, config, secret_args, progress_callback=NullProgressReporter()):
         con_type = config.config["connector"]["type"]
 
         try:
@@ -88,15 +95,10 @@ class Scanner:
             import_module(module_name)
 
             Scanner = getattr(import_module(module_name), scanner_class)
-            return Scanner(config, progress_callback)
+            return Scanner(config, secret_args, progress_callback)
         except:
             raise
             raise ActivateConfigError(f"Connection type '{con_type}' not supported")
-
-        if con_type == "database":
-            return AlchemyScanner(config, progress_callback)
-
-        raise ActivateConfigError(f"Connection type '{con_type}' not supported")
 
     def add_metadata(self, item_type, active_id, item):
         # metadata = {
@@ -172,7 +174,7 @@ class Scanner:
         components.append(component)
 
 
-    def scan_metadata(self):
+    async def scan_metadata(self):
         self.scan_datasets()
 
     def metadata_as_dict(self):

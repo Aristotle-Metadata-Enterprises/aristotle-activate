@@ -140,7 +140,7 @@ class Scanner:
         if active_id not in self._metadata[item_type].keys():
             self.add_metadata(item_type, active_id, item)
         
-    def append_metadata_component(self, item_type, active_id, component_name, component, with_order=False):
+    def append_metadata_component(self, item_type, active_id, component_name, component, with_order=False, force_unique=True):
         self.upsert_metadata(item_type, active_id)
 
         item = self._metadata[item_type][active_id]
@@ -166,11 +166,24 @@ class Scanner:
             self._metadata[item_type][active_id].setdefault(component_name, [])
             components = self._metadata[item_type][active_id][component_name]
 
+        check_in_set = lambda c: c in components
+
         if with_order:
+            def check_in_set(c):
+                # We need to remove the order to check if the component is in the set
+                unordered_component = c.copy()
+                unordered_component.pop('order')
+                for comp in components:
+                    unordered_comp = comp.copy()
+                    unordered_comp.pop('order')
+                    if unordered_component == unordered_comp:
+                        return True
+                return False
+                    
             component['order'] = len(components)
 
-        components.append(component)
-
+        if not force_unique or not check_in_set(component):
+            components.append(component)
 
     def scan_metadata(self):
         self.scan_datasets()

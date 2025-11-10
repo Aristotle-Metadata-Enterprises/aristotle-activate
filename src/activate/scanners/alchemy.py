@@ -111,6 +111,8 @@ class AlchemyScanner(Scanner):
         return False
 
     def scan_datasets(self):
+        self.progress.update(1, "Scanning database tables")
+
         all_items = self.tables.copy()
         for schema in all_items.keys():
             all_items[schema].extend(self.views.get(schema, []))

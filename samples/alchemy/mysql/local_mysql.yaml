@@ -1,0 +1,7 @@
+#  poetry run activateme --config ../samples/alchemy/mysql/local_mysql.yaml -S > ../../mydatabase_metadata.log
+connector:
+  type: activate.scanners.alchemy.AlchemyScanner
+  options:
+    # The database URL of the source system to scan
+    # https://docs.sqlalchemy.org/en/20/core/engines.html
+    database_url: "mysql+pymysql://myuser2:mypassword2@localhost:13306/mydatabase"

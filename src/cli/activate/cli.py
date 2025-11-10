@@ -6,7 +6,7 @@ import time
 import asyncio
 
 from activate.utils.config import Config
-from activate.utils.exceptions import ActivateConfigError
+from activate.utils.exceptions import ActivateConfigError, MissingSecretArg
 from activate.scanners.base import Scanner
 from activate.utils.progress import ProgressReporter
 
@@ -65,8 +65,9 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
         scanner = Scanner.from_config(config, secret_args=scargs_dict)
         scanner = activate_metadata(scanner)
     except ActivateConfigError as e:
-        raise
         raise click.ClickException(f"Failed to prepare configuration or scan metadata: {e}")
+    except MissingSecretArg as e:
+        raise click.ClickException(f"Secret argument not set, use --scarg={e.arg_name}::YOUR_VALUE to set argument")
 
     if priority:
         data = scanner.metadata_as_priority_dict()
@@ -85,7 +86,7 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
 
     if upload:
         if not config.config.get('registry', None):
-            click.echo("Error: No registry configured. Performing a dry run ONLY.")
+            click.echo("Warning: No registry URL configured. Performing a dry run ONLY.")
         else:
             click.echo(f"Sending results to {config.config['registry']['url']}")
             click.echo(f"Waiting 3 seconds before sending... press Crtl-C to abort...")

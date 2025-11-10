@@ -2,7 +2,7 @@ import hashlib
 from importlib import import_module
 from collections import defaultdict
 from sqlalchemy.ext.automap import automap_base
-from activate.utils.exceptions import ActivateConfigError
+from activate.utils.exceptions import ActivateConfigError, MissingSecretArg
 from activate.utils.loaddb import prepare_engine
 from activate.utils.progress import NullProgressReporter
 
@@ -46,7 +46,10 @@ class Scanner:
 
         for secret_arg_name in self.required_secret_args:
             if secret_arg_name not in secret_args.keys():
-                raise ActivateConfigError(f"Missing required secret argument '{secret_arg_name}' for scanner")
+                raise MissingSecretArg(
+                    f"Missing required secret argument '{secret_arg_name}' for scanner",
+                    arg_name=secret_arg_name
+                )
         self.secret_args = secret_args
 
     def scan_datasets(self):

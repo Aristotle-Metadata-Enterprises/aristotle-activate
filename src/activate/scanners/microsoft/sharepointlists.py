@@ -49,11 +49,15 @@ class SharepointListScanner(Scanner):
         return self.options.get('prefix', "")
 
     async def scan_metadata(self):
-        print(self.secret_args)
-
         lists = await self.connector.get_sharepoint_lists()
         
         for slist in lists:
+            invalid_list = any([
+                slist.name.endswith("_wiki"),
+                slist.created_by.user.display_name == "System Account",
+            ])
+            if invalid_list:
+                continue
             print(slist.name, slist.web_url)
             print(slist)
             distribution = await self.list_to_distribution(slist)
@@ -81,16 +85,21 @@ class SharepointListScanner(Scanner):
         print("Columns:", [col.name for col in columns])
         columns_data = []
         for i, column in enumerate(columns):
-
             path_id = self.make_active_column_id(slist.id, column.id)
+            foreign_key = None
+            if column.lookup and column.lookup.list_id:
+                foreign_key = self.make_active_column_id(column.lookup.list_id, column.lookup.column_name)
             col_data = {
                 # Active content
                 "activate": {
                     "id": path_id,
                     "active_datatype": None,
                     "primary_key": False,
-                    "nullable": False,
-                    "foreign_key": False,
+                    "nullable": not column.required,
+                    "foreign_key": foreign_key,
+                    "extra_data": {
+                        "values": getattr(column.choice, 'choices', None)
+                    },
                 },
                 "id": path_id,
                 "order": i,

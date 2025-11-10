@@ -82,7 +82,7 @@ class AlchemyScanner(Scanner):
 
             select_sql = match.group(1).strip().rstrip(';')
 
-            ast = parse_one(select_sql, dialect="mysql")
+            ast = parse_one(select_sql, dialect=self.engine.name.lower())
             tables = [t.name for t in ast.find_all(exp.Table)]
             return list(set(tables))
         except Exception as e:
@@ -143,7 +143,15 @@ class AlchemyScanner(Scanner):
 
         if source_table_names:
             # I'm not sure here - we need to create the active IDs for the source tables
-            dist['provenance'] = source_table_names
+            for i, view_table in enumerate(source_table_names):
+                dist.setdefault('distributionprovenance_set', []).append({
+                    "source_distributions": [
+                        self.make_active_id('distribution', view_table),
+                    ],
+                    "generation": "",
+                    "release_date": None,
+                    "order": i
+                })
 
         columns = table.columns
         for i, column in enumerate(columns):

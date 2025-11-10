@@ -11,7 +11,7 @@ from activate.utils.config import Config
 
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
-from sqlalchemy import inspect, create_engine
+from sqlalchemy import inspect, create_engine, MetaData
 
 
 def prepare_engine(config: Config):
@@ -22,8 +22,11 @@ def prepare_engine(config: Config):
 
     # reflect the tables
     Base.prepare(autoload_with=engine)
+    # meta = MetaData(engine)
+    # meta.reflect(bind=engine, views=True)
+    meta = None
     # return Base
-    return inspect(engine)
+    return inspect(engine), meta
 
 
 class AlchemyScanner(Scanner):
@@ -31,7 +34,7 @@ class AlchemyScanner(Scanner):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.inspector = prepare_engine(self.config)
+        self.inspector, self.othermeta = prepare_engine(self.config)
         self.engine = self.inspector.engine
 
         Base = automap_base()
@@ -39,6 +42,7 @@ class AlchemyScanner(Scanner):
             Base.prepare(autoload_with=self.engine, schema=schema)
 
         self.metadata = Base.metadata
+        self.metadata.reflect(bind=self.engine, extend_existing=True, views=True)
         self.number_of_tables = len(self.metadata.tables)
 
     @property
@@ -62,6 +66,29 @@ class AlchemyScanner(Scanner):
 
         self.progress.finish()
 
+    def extract_tables_from_view(self, view_name: str):
+        """
+        Given a view definition SQL, extract the source tables used in the view.
+        """
+        from sqlglot import parse_one, exp
+        import re
+
+        view_def = self.inspector.get_view_definition(view_name)
+
+        try:
+            match = re.search(r'\bAS\b\s+(SELECT\b.*)', view_def, flags=re.IGNORECASE | re.DOTALL)
+            if not match:
+                return []
+
+            select_sql = match.group(1).strip().rstrip(';')
+
+            ast = parse_one(select_sql, dialect="mysql")
+            tables = [t.name for t in ast.find_all(exp.Table)]
+            return list(set(tables))
+        except Exception as e:
+            self.logger.error(f'Unable to get source tables for view: {view_name}, error: {e}')
+            return []
+
     def scan_dataset(self, schema_name) -> dict:
         """
         Scans a schema engine and finds all tables, views, etc and builds a dictionary from them.
@@ -73,27 +100,34 @@ class AlchemyScanner(Scanner):
             "datasetdistributionpath_set": [],
         }
 
-        for i, table in enumerate(self.metadata.tables.keys()):
-            if table.startswith(f"{schema_name}."):
-                distribution = self.scan_distribution(schema_name, table)
-                self.add_metadata("distribution", distribution["uuid"], distribution)
+        table_names = self.inspector.get_table_names(schema=schema_name)
+        view_names = self.inspector.get_view_names(schema=schema_name)
 
-                dataset_dist_id = self.make_active_table_link_id(table)
-                dataset["datasetdistributionpath_set"].append(
-                    {
-                        "activate": {
-                            "id": dataset_dist_id,
-                        },
+        for i, table in enumerate(table_names + view_names):
+            source_table_names = []
+            if table in view_names:
+                source_table_names = self.extract_tables_from_view(table)
+
+            distribution = self.scan_distribution(schema_name, table, source_table_names)
+
+            self.add_metadata("distribution", distribution["uuid"], distribution)
+
+            dataset_dist_id = self.make_active_table_link_id(table)
+            dataset["datasetdistributionpath_set"].append(
+                {
+                    "activate": {
                         "id": dataset_dist_id,
-                        "order": i,
-                        "distribution": distribution["uuid"],
-                    }
-                )
-                self.progress.add(100 / self.number_of_tables)
+                    },
+                    "id": dataset_dist_id,
+                    "order": i,
+                    "distribution": distribution["uuid"],
+                }
+            )
+            self.progress.add(100 / self.number_of_tables)
 
         return dataset
 
-    def scan_distribution(self, schema_name, table_name) -> dict:
+    def scan_distribution(self, schema_name, table_name, source_table_names=[]) -> dict:
         """
         Scans an engine for a given table name and builds a data dictionary.
         """
@@ -106,6 +140,10 @@ class AlchemyScanner(Scanner):
             "format_type": self.engine.name,    
             "distributiondataelementpath_set": [],
         }
+
+        if source_table_names:
+            # I'm not sure here - we need to create the active IDs for the source tables
+            dist['provenance'] = source_table_names
 
         columns = table.columns
         for i, column in enumerate(columns):

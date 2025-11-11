@@ -63,22 +63,10 @@ class AlchemyScanner(Scanner):
         self.progress.update(1, "Scanning database tables")
         dataset_names = self.get_dataset_names()
         for schema_name in dataset_names:
-            if self.is_system_schema(schema_name):
-                continue
             dataset = self.scan_dataset(schema_name)
             self.add_metadata("dataset", dataset["uuid"], dataset)
 
         self.progress.finish()
-
-    def is_system_schema(self, schema_name):
-        engine_name = self.engine.name.lower()
-        if engine_name == "mysql":
-            return schema_name.lower() in ("information_schema", "mysql", "performance_schema", "sys")
-        elif engine_name == "postgresql":
-            return schema_name.lower().startswith("pg_") or schema_name.lower() == "information_schema"
-        elif engine_name == "sqlite":
-            return False
-        return False
 
     def extract_tables_from_view(self, view_name: str):
         """

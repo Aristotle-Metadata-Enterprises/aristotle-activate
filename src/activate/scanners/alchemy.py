@@ -173,7 +173,7 @@ class AlchemyScanner(Scanner):
                 }
             )
             self.progress.add(100 / self.number_of_tables)
-            self.upsert_metadata_order('dataset', dataset['uuid'], self.calc_order_hint('dataset', dataset))
+            self.upsert_metadata_order("dataset", dataset["uuid"], self.calc_order_hint("dataset", dataset))
         return dataset
 
     def scan_distribution(self, schema_name, table_name, source_table_names=[]) -> dict:
@@ -211,7 +211,7 @@ class AlchemyScanner(Scanner):
             }
             active_datatype['uuid'] = self.make_constant_ns_id("datatype", active_datatype['name'])
             self.add_metadata("datatype", active_datatype["uuid"], active_datatype)
-            self.upsert_metadata_order('datatype', active_datatype["uuid"], self.calc_order_hint('datatype', active_datatype))
+            self.upsert_metadata_order("datatype", active_datatype["uuid"], self.calc_order_hint("datatype", active_datatype))
 
             active_value_domain = {
                 "name": type_name,
@@ -223,7 +223,7 @@ class AlchemyScanner(Scanner):
                 active_value_domain['maximum_length'] = column.type.length
             active_value_domain['uuid'] = self.make_constant_ns_id("valuedomain", active_value_domain['name'])
             self.add_metadata("valuedomain", active_value_domain["uuid"], active_value_domain)
-            self.upsert_metadata_order('valuedomain', active_value_domain["uuid"], self.calc_order_hint('valuedomain', active_value_domain))
+            self.upsert_metadata_order("valuedomain", active_value_domain["uuid"], self.calc_order_hint("valuedomain", active_value_domain))
 
             foreign_key = None
             if column.foreign_keys:
@@ -252,5 +252,5 @@ class AlchemyScanner(Scanner):
             }
 
             dist["distributiondataelementpath_set"].append(col_data)
-            self.upsert_metadata_order('distribution', dist['uuid'], self.calc_order_hint('distribution', dist))
+            self.upsert_metadata_order("distribution", dist["uuid"], self.calc_order_hint("distribution", dist))
         return dist

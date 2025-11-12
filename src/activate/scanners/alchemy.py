@@ -90,7 +90,6 @@ class AlchemyScanner(Scanner):
             order_hint += 1
 
         distribution_graph = _build_distribution_graph(list(self._metadata.get("distribution", {}).values()))
-        print(distribution_graph)
         for level in toposort(distribution_graph):
             for item in level:
                 self.upsert_metadata_order("distribution", item, order_hint)
@@ -233,7 +232,6 @@ class AlchemyScanner(Scanner):
                         fkey.column.table.fullname,
                         fkey.column.name
                     )
-                print('fkey', fkey.column.table.fullname, fkey.column.name)
 
             path_id = self.make_active_column_id(table.name, column.name)
             col_data = {

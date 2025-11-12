@@ -31,8 +31,6 @@ def prepare_engine(config: Config):
 
 class AlchemyScanner(Scanner):
     name = "alchemy"
-    METADATA_ORDER_HINTS = ("datatype", "valuedomain", "distribution", "distribution_has_provenance",
-                                  "subset", "subset_has_provenance", "dataset", "dataset_has_provenance")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -63,10 +61,56 @@ class AlchemyScanner(Scanner):
         self.progress.update(1, "Scanning database tables")
         dataset_names = self.get_dataset_names()
         for schema_name in dataset_names:
+            if self.is_system_schema(schema_name):
+                continue
             dataset = self.scan_dataset(schema_name)
             self.add_metadata("dataset", dataset["uuid"], dataset)
 
+        self.calc_order_hints()
+
         self.progress.finish()
+
+    def calc_order_hints(self):
+        def _build_distribution_graph(_distributions:list):
+            _graph = {}
+            for _distribution in _distributions:
+                _dependencies = set([
+                    _src
+                    for _item in _distribution.get("distributionprovenance_set", [])
+                    for _src in _item.get("source_distributions", [])
+                ])
+                _graph[_distribution["uuid"]] = _dependencies
+            return _graph
+
+        from toposort import toposort
+        order_hint = 1
+        for item_type in ("datatype", "valuedomain"):
+            for active_id in self._metadata.get(item_type, {}).keys():
+                self.upsert_metadata_order(item_type, active_id, order_hint)
+            order_hint += 1
+
+        distribution_graph = _build_distribution_graph(list(self._metadata.get("distribution", {}).values()))
+        print(distribution_graph)
+        for level in toposort(distribution_graph):
+            for item in level:
+                self.upsert_metadata_order("distribution", item, order_hint)
+            order_hint += 1
+
+        for active_id in self._metadata.get("dataset", {}).keys():
+            self.upsert_metadata_order("dataset", active_id, order_hint)
+
+    def is_system_schema(self, schema_name):
+        engine_name = self.engine.name.lower()
+        schema_name = schema_name.lower()
+        if engine_name == "mysql":
+            return schema_name in ("information_schema", "mysql", "performance_schema", "sys")
+        elif engine_name == "postgresql":
+            return schema_name.startswith("pg_") or schema_name == "information_schema"
+        elif engine_name == "mssql":
+            return schema_name.startswith("sys") or schema_name == "information_schema" or schema_name == "guest" or schema_name.startswith("db_")
+        elif engine_name == "sqlite":
+            return False
+        return False
 
     def extract_tables_from_view(self, view_name: str):
         """
@@ -84,47 +128,16 @@ class AlchemyScanner(Scanner):
 
             select_sql = match.group(1).strip().rstrip(';')
 
-            ast = parse_one(select_sql, dialect=self.engine.name.lower())
+            dialect = self.engine.dialect.name
+            if dialect == "mssql":
+                dialect = "tsql"
+            ast = parse_one(select_sql, dialect=dialect)
             tables = [t.name for t in ast.find_all(exp.Table)]
             return list(set(tables))
         except Exception as e:
             self.logger.error(f'Unable to get source tables for view: {view_name}, error: {e}')
             return []
 
-    def calc_order_hint(self, item_type:str, item:dict):
-        def _calc_metadata_type(_item_type: str, _item: dict):
-            if _item_type == "distribution":
-                distributionprovenance_set = _item.get("distributionprovenance_set", [])
-                if distributionprovenance_set:
-                    source_distributions = distributionprovenance_set[0].get("source_distributions", [])
-                    if source_distributions:
-                        _item_type = "distribution_has_provenance"
-            elif _item_type == "dataset":
-                has_provenance = False
-                provenance_set = _item.get("provenance_set", [])
-                if provenance_set:
-                    source_datasets = provenance_set[0].get("source_datasets", [])
-                    if source_datasets:
-                        has_provenance = True
-
-                is_subset = True
-                datasetdistributiongroup_set = _item.get("datasetdistributiongroup_set", {})
-                if datasetdistributiongroup_set and not datasetdistributiongroup_set.get("datasetdatasetpath_set", []):
-                    is_subset = False
-
-                _mapping = {
-                    (True, True): "subset_has_provenance",
-                    (True, False): "subset",
-                    (False, True): "dataset_has_provenance",
-                    (False, False): "dataset",
-                }
-                _item_type = _mapping[(is_subset, has_provenance)]
-            return _item_type
-
-        metadata_type = _calc_metadata_type(item_type, item)
-        if metadata_type in self.METADATA_ORDER_HINTS:
-            return self.METADATA_ORDER_HINTS.index(metadata_type)
-        return 0
 
     def scan_dataset(self, schema_name) -> dict:
         """
@@ -135,11 +148,15 @@ class AlchemyScanner(Scanner):
             "uuid": self.make_active_id('dataset', schema_name),
             "name": schema_name,
             "datasetdistributionpath_set": [],
+            "datasetdistributiongroup_set": {
+                "name": "Root",
+                "order": 0,
+            }
         }
 
         table_names = self.inspector.get_table_names(schema=schema_name)
         view_names = self.inspector.get_view_names(schema=schema_name)
-
+        datasetdistributionpath_set = []
         for i, table in enumerate(table_names + view_names):
             source_table_names = []
             if table in view_names:
@@ -150,18 +167,15 @@ class AlchemyScanner(Scanner):
             self.add_metadata("distribution", distribution["uuid"], distribution)
 
             dataset_dist_id = self.make_active_table_link_id(table)
-            dataset["datasetdistributionpath_set"].append(
+            datasetdistributionpath_set.append(
                 {
-                    "activate": {
-                        "id": dataset_dist_id,
-                    },
-                    "id": dataset_dist_id,
                     "order": i,
                     "distribution": distribution["uuid"],
                 }
             )
             self.progress.add(100 / self.number_of_tables)
-            self.upsert_metadata_order("dataset", dataset["uuid"], self.calc_order_hint("dataset", dataset))
+        if datasetdistributionpath_set:
+            dataset["datasetdistributiongroup_set"]["datasetdistributionpath_set"] = datasetdistributionpath_set
         return dataset
 
     def scan_distribution(self, schema_name, table_name, source_table_names=[]) -> dict:
@@ -175,7 +189,7 @@ class AlchemyScanner(Scanner):
             "name": str(table.name),
             # "updated_date": NOW
             "format_type": self.engine.name,    
-            "distributiondataelementpath_set": [],
+            "distributiondataelementpath_set": []
         }
 
         if source_table_names:
@@ -199,7 +213,6 @@ class AlchemyScanner(Scanner):
             }
             active_datatype['uuid'] = self.make_constant_ns_id("datatype", active_datatype['name'])
             self.add_metadata("datatype", active_datatype["uuid"], active_datatype)
-            self.upsert_metadata_order("datatype", active_datatype["uuid"], self.calc_order_hint("datatype", active_datatype))
 
             active_value_domain = {
                 "name": type_name,
@@ -211,7 +224,6 @@ class AlchemyScanner(Scanner):
                 active_value_domain['maximum_length'] = column.type.length
             active_value_domain['uuid'] = self.make_constant_ns_id("valuedomain", active_value_domain['name'])
             self.add_metadata("valuedomain", active_value_domain["uuid"], active_value_domain)
-            self.upsert_metadata_order("valuedomain", active_value_domain["uuid"], self.calc_order_hint("valuedomain", active_value_domain))
 
             foreign_key = None
             if column.foreign_keys:
@@ -221,6 +233,7 @@ class AlchemyScanner(Scanner):
                         fkey.column.table.fullname,
                         fkey.column.name
                     )
+                print('fkey', fkey.column.table.fullname, fkey.column.name)
 
             path_id = self.make_active_column_id(table.name, column.name)
             col_data = {
@@ -230,7 +243,7 @@ class AlchemyScanner(Scanner):
                     "active_datatype": active_datatype['uuid'],
                     "primary_key": column.primary_key,
                     "nullable": column.nullable,
-                    "foreign_key": foreign_key,
+                    "foreign_key": None, # todo, remove foreign_key for test
                 },
                 "id": path_id,
                 "order": i,
@@ -240,5 +253,5 @@ class AlchemyScanner(Scanner):
             }
 
             dist["distributiondataelementpath_set"].append(col_data)
-            self.upsert_metadata_order("distribution", dist["uuid"], self.calc_order_hint("distribution", dist))
+
         return dist

@@ -5,7 +5,7 @@
 2. [uv](https://docs.astral.sh/uv/getting-started/installation/#pypi)
 
 ## Development
-[!NOTE]
+> [!CAUTION]
 > Don't blindly run command without knowing anything about what it does. Perform at your own risk!
 
 To get the developement environement up and ready, execute the following commands:

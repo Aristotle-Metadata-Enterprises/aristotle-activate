@@ -3,7 +3,6 @@ from dataclasses import dataclass
 import uuid
 import json
 
-
 MAX_ITEMS_PER_PAYLOAD = 75
 MAX_PAYLOAD_SIZE_IN_BYTES = 2 * 1024 * 1024  # 2MB
 
@@ -19,12 +18,13 @@ class Registry:
 
     endpoints = {
         "send_payload": "/api/activate/payload",
-        "send_payload_to_pipeline": "/api/activate/pipeline/{self.pipeline}/payload"
+        "send_payload_to_pipeline": "/api/activate/pipeline/{self.pipeline}/payload/{payload_id}",
+        "send_chunk_to_payload_to_pipeline": "/api/activate/pipeline/{self.pipeline}/payload/{payload_id}/chunk",
     }
 
-    def endpoint(self, endpoint):
+    def endpoint(self, endpoint, **kwargs):
         base = self.url.rstrip("/")
-        endpoint = self.endpoints[endpoint].format(self=self).lstrip("/")
+        endpoint = self.endpoints[endpoint].format(self=self, **kwargs).lstrip("/")
         url = f"{base}/{endpoint}"
         return url
 
@@ -33,13 +33,15 @@ class Registry:
             return token
         return ""
 
-    def send_payload(self, data):
+    def send_payload(self, data, payload_id=None):
         if not self.url:
             self.url = "activate://dry-run.example.com"
             self.dry_run = True
+        if not payload_id:
+            payload_id = uuid.uuid4()
 
         if self.pipeline:
-            url = self.endpoint("send_payload_to_pipeline")
+            url = self.endpoint("send_chunk_to_payload_to_pipeline", payload_id=payload_id)
         else:
             url = self.endpoint("send_payload")
         token = self.get_api_token()
@@ -69,7 +71,42 @@ class Registry:
             response.url = url
         return response
 
-    def send_as_chunked_payloads(self, scanner, metadata_types_to_send=None):
+    def prepare_payload(self, payload_id, data):
+        if not self.url:
+            self.url = "activate://dry-run.example.com"
+            self.dry_run = True
+
+        url = self.endpoint("send_payload_to_pipeline", payload_id=payload_id)
+        token = self.get_api_token()
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Token {token}"
+        }
+
+        verify = not self.disable_ssl_verification
+        if self.dry_run:
+            response = requests.models.Response()
+            response.status_code = 201
+            response._content = b'Dry run - not sent'
+            response.url = url
+            return response
+        try:
+            response = requests.post(
+                url,
+                headers=headers, json=data, verify=verify
+            )
+        except Exception as e:
+            # Return a mock response
+            response = requests.models.Response()
+            response.status_code = 499
+            response._content = str(e)
+            response.url = url
+        return response
+
+    def send_as_chunked_payloads(self, scanner, payload_id=None, metadata_types_to_send=None):
+        if not payload_id:
+            payload_id = uuid.uuid4()
 
         send_order = [
             'datatype',
@@ -92,21 +129,33 @@ class Registry:
         items_sent = 0
         chunks_sent = 0
 
+        payload_data = {
+            "name": str(payload_id),
+            "expected_item_number": total_items
+        }
+        response = self.prepare_payload(payload_id, payload_data)
+        print(response)
+        print(response.content)
+
         for md_type in metadata_types_to_send:
-            for priority, prioritised_items in metadata.get(md_type,{}).items():
+            for priority, prioritised_items in metadata.get(md_type, {}).items():
                 total_items_in_priority = len(prioritised_items)
                 for chunk_number, items in self.create_metadata_for_payload(prioritised_items):
                     description = f"{md_type}.priority-{priority}.chunk-{chunk_number}.json"
                     json_data = {
-                        "description": description,
-                        "payload_data": {
+                        "name": description,
+                        # "description": description,
+                        "priority": priority,
+                        "items": {
                             md_type: items
                         },
                     }
                     items_in_chunk = len(items)
                     chunks_sent += 1
                     items_sent += items_in_chunk
-                    response = self.send_payload(json_data)
+                    response = self.send_payload(json_data, payload_id)
+                    print(json.dumps(json_data, indent=4))
+                    # 1/0
                     yield {
                         'pipeline': self.pipeline,
                         'response': response,
@@ -134,8 +183,8 @@ class Registry:
         for item in metadata_set:
             item_size = len(json.dumps(item).encode('utf-8'))
             payload_too_big = (
-                (chunk_items_size + item_size > MAX_PAYLOAD_SIZE_IN_BYTES) or
-                (items_in_chunk >= self.chunk_item_size)
+                    (chunk_items_size + item_size > MAX_PAYLOAD_SIZE_IN_BYTES) or
+                    (items_in_chunk >= self.chunk_item_size)
             )
             if payload_too_big:
                 # If the payload is too big, yield the result so it can be sent
@@ -150,8 +199,7 @@ class Registry:
                 # This else is just for clarity to show that either way
                 # we need to append the current item to the current chunk or the new one.
                 pass
-                
-            
+
             items.append(item)
             chunk_items_size += item_size
             items_in_chunk += 1

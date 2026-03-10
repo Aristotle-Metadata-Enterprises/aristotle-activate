@@ -1,0 +1,2 @@
+VIEW_DB,VIEW_TBL,TBL_DB,TBL_TBL,ColumnName,Column1,ColumnType,ColumnFormat,SOURCE_SYSTEM_NAME,SOURCE_TABLE_NAME,SOURCE_COLUMN_NAME
+Target database,Target object,Source database,Source object,Target column,Source column,Physical data type,Data format,Source system,Source system table,Source system column

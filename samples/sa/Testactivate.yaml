@@ -1,0 +1,169 @@
+activate_options:
+  # needed for compatibility with original script
+  namespace_separator: ""
+  hashing_method: md5
+  # output_plaintext_with_hash: true
+
+registry:
+#  url: https://staging.kangaroo.aristotle.ninja/
+  url: http://127.0.0.1:8000/
+#  api_token: baa29494b8cdc4849c3ef637abcd211f51c0f8cf
+  # api_token: ea0b9b27b20774a7ec7386e8345f0dd8c763e959
+  pipeline: c4ed90d2-1c1c-11f1-8b4a-46e32a28dd96
+
+active_id_definitions:
+  # source_datasets: &source_datasets_active_id
+  #   prefix: "SA_EDW"
+  #   columns:
+  #     - TBL_DB
+  # target_datasets: &target_datasets_active_id
+  #   prefix: "Dest_Prefix"
+  #   columns:
+  #     - VIEW_DB
+  source_distributions: &source_distributions_active_id
+    prefix: "Source_Prefix"
+    columns:
+      - TBL_DB
+      - TBL_TBL
+  target_distributions: &target_distributions_active_id
+    prefix: "Dest_Prefix"
+    columns:
+      - VIEW_DB
+      - VIEW_TBL
+  source_distribution_path: &source_distribution_path_id
+    prefix: "Source_Prefix"
+    columns:
+      - TBL_DB
+      - TBL_TBL
+      - ColumnName
+  target_distribution_path: &target_distribution_path_id
+    prefix: "Dest_Prefix"
+    columns:
+      - VIEW_DB
+      - VIEW_TBL
+      - ColumnName
+  datatypes: &physical_datatype_id
+    prefix: "Prefix"
+    columns:
+      - ColumnType
+
+
+# Ignoring columns:
+# * SOURCE_SYSTEM_NAME
+# * SOURCE_TABLE_NAME
+# * SOURCE_COLUMN_NAME
+
+connector:
+  type: activate.scanners.metamapper.MetaMapperScanner
+  options:
+
+    # relavtive path to file
+    file: "./Testactivate.csv"
+
+    metadata_types:
+      - metadata_type: datatype
+        details: "The physical datatypes - these probably exist, but just to be safe we're going to create stubs anyway" 
+        active_id: *physical_datatype_id
+        on_create:
+          # If we are creating this item, we will set a name
+          # If it already exists in Aristotle, this will keep the name in Aristotle without changing it.
+          name: "ColumnType"
+
+      - metadata_type: distribution
+        details: "Source datasets"
+        order_hint: 1
+
+        active_id: *source_distributions_active_id
+
+        on_create:
+            name: "TBL_TBL"
+
+        components:
+          distributiondataelementpath_set:
+              with_order: true
+              
+              fields:
+                id: 
+                  type: active_id
+                  metadata_type: dist_path
+                  active_id: *source_distribution_path_id
+
+                logical_path: ColumnName
+                specific_information: ColumnFormat
+
+                activate:
+                  type: dict
+                  keys:
+                    id: 
+                      type: active_id
+                      metadata_type: dist_path
+                      active_id: *source_distribution_path_id
+                    active_datatype: 
+                      type: active_id
+                      metadata_type: datatype
+                      active_id: *physical_datatype_id
+                    # This are required by the API, but we don't have this info in the CSV
+                    primary_key:
+                      type: literal
+                      value: false
+                    nullable:
+                      type: literal
+                      value: false
+                    foreign_key:
+                      type: literal
+                      value: null
+
+
+      - metadata_type: distribution
+        details: "Target distributions"
+        order_hint: 2
+
+        active_id: *target_distributions_active_id
+
+        on_create:
+            name: "VIEW_TBL"
+
+        components:
+          distributionprovenance_set:
+              with_order: true
+              fields:
+                source_distributions:
+                  type: list
+                  values:
+                    - type: active_id
+                      metadata_type: distribution
+                      active_id: *source_distributions_active_id
+
+          distributiondataelementpath_set:
+              with_order: true
+              
+              fields:
+                id: 
+                  type: active_id
+                  metadata_type: dist_path
+                  active_id: *target_distribution_path_id
+
+                logical_path: ColumnName
+                specific_information: ColumnFormat
+
+                activate:
+                  type: dict
+                  keys:
+                    id: 
+                      type: active_id
+                      metadata_type: dist_path
+                      active_id: *target_distribution_path_id
+                    active_datatype: 
+                      type: active_id
+                      metadata_type: datatype
+                      active_id: *physical_datatype_id
+                    # This are required by the API, but we don't have this info in the CSV
+                    primary_key:
+                      type: literal
+                      value: false
+                    nullable:
+                      type: literal
+                      value: false
+                    foreign_key:
+                      type: literal
+                      value: null

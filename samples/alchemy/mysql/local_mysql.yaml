@@ -4,4 +4,4 @@ connector:
   options:
     # The database URL of the source system to scan
     # https://docs.sqlalchemy.org/en/20/core/engines.html
-    database_url: "mysql+pymysql://myuser2:mypassword2@localhost:13306/mydatabase"
+    database_url: "mysql+pymysql://root:123456@localhost:13306/mydatabase"

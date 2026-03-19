@@ -7,6 +7,35 @@ import json
 MAX_ITEMS_PER_PAYLOAD = 75
 MAX_PAYLOAD_SIZE_IN_BYTES = 2 * 1024 * 1024  # 2MB
 
+# This is required until we can alter the server to handle types properly
+# This will fail if there are more than 99 priority levels for any given item.
+# This is unlikely as we only have 3 layers at the moment
+TYPE_PRIORITY = {
+    "glossary": 100,
+    "relation": 200,
+    "objectclass": 300,
+    "objectclassspecialisation": 400,
+    "property": 500,
+    "propertygroup": 600,
+    "datatype": 700,
+    "unitofmeasure": 800,
+    "conceptualdomain": 900,
+    "valuedomain": 1000,
+    "dataelementconcept": 1100,
+    "dataelement": 1200,
+    "dataelementderivation": 1300,
+    "datasetspecification": 1400,
+    "distribution": 1500,
+    "dataset": 1600,
+    "datacatalog": 1700,
+    "outcomearea": 1800,
+    "qualitystatement": 1900,
+    "framework": 2000,
+    "indicator": 2100,
+    "indicatorset": 2200,
+    "classification": 2300,
+    "correspondencetable": 2400
+}
 
 @dataclass
 class Registry:
@@ -135,8 +164,6 @@ class Registry:
             "expected_item_number": total_items
         }
         response = self.prepare_payload(payload_id, payload_data)
-        print(response)
-        print(response.content)
 
         for md_type in metadata_types_to_send:
             for priority, prioritised_items in metadata.get(md_type,{}).items():
@@ -146,7 +173,7 @@ class Registry:
                     json_data = {
                         "name": description,
                         # "description": description,
-                        "priority": priority,
+                        "priority": priority+TYPE_PRIORITY[md_type],
                         "items": {
                             md_type: items
                         },
@@ -155,10 +182,10 @@ class Registry:
                     chunks_sent += 1
                     items_sent += items_in_chunk
                     response = self.send_payload(json_data, payload_id)
-                    print(json.dumps(json_data, indent=4))
                     # 1/0
                     yield {
                         'pipeline': self.pipeline,
+                        'data_sent': json_data,
                         'response': response,
                         'priority': priority,
                         'metadata_type': md_type,

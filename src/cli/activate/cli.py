@@ -69,12 +69,12 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
         click.echo(
             f"Activate scan complete. Results stored in {output_file.name}"
         )
-    if show:
-        click.echo("Printing to STDOUT")
-        click.echo(json.dumps(data, indent=4))
+    # if show:
+    #     click.echo("Printing to STDOUT")
+    #     click.echo(json.dumps(data, indent=4))
 
-    if upload:
-        if not config.config.get('registry', None):
+    if upload or dry_run:
+        if dry_run or not config.config.get('registry', None):
             click.echo("Error: No registry configured. Performing a dry run ONLY.")
         else:
             click.echo(f"Sending results to {config.config['registry']['url']}")
@@ -107,6 +107,8 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
             
             click.echo('{progress:4d}% - Sending Chunk #{chunk_number} - {items_in_chunk} of {total_items_in_priority} {metadata_type}(s) with priority {priority}'.format(progress=current_progress, **status))
             if response.status_code == 201:
+                if show:
+                    click.echo(json.dumps(status['data_sent'], indent=4)) 
                 click.echo('    OK')
                 click.echo('{progress:4d}% - Sent {items_sent} of {total_items_to_send} total'.format(progress=assumed_progress, **status))
             else:

@@ -15,6 +15,7 @@ requests = ">=2.32.5"
 sqlalchemy = ">=2.0.43"
 turfpy = ">=0.0.8"
 pymysql = "^1.1.2"
+sqlglot = "^27.29.0"
 
 [tool.poetry.scripts]
 activateme = "cli.activate.cli:activate_cli"

@@ -120,7 +120,7 @@ class AlchemyScanner(Scanner):
             active_value_domain = {
                 "name": type_name,
                 "definition": f"An SQL primative datatype of type {type_name}",
-                "data_type": active_datatype['uuid']
+                # "data_type": active_datatype['uuid']
             }
             if hasattr(column.type, 'length'):
                 active_value_domain['name'] = f"{type_name}({column.type.length})"

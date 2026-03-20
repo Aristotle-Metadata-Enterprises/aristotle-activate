@@ -106,6 +106,8 @@ class Scanner:
         #     "glossary_item": {},
         #     "data_element": {},
         # }
+        if 'on_create' not in item.keys():
+            item['on_create'] = {}
         self.setdefault_metadata_order(item_type, active_id, 0)
         self._metadata[item_type][active_id] = item
 

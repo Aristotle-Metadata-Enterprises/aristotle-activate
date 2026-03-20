@@ -18,12 +18,13 @@ from activate.utils.progress import ProgressReporter
 @click.option("-T", "--api-token", type=click.STRING, help="API Token. This can alternatively be set with the ACTIVATE_API_TOKEN environment variable. This will override a token specified in the configuration file")
 @click.option("-R", "--registry_url", type=click.STRING, help="Registry for upload. This will override a registry specified in the configuration file")
 @click.option("-P", "--pipeline_uuid", type=click.STRING, help="Pipeline UUID to feed into. This will override a pipeline specified in the configuration file")
+@click.option("-I", "--payload_id", type=click.STRING, help="Payload UUID to feed into.")
 @click.option("-p", "--priority", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by priority hints. Only valid for output file (-o) or show (-S)")
 @click.option("--metadata-types", type=click.STRING, default=None, help="Only send the specified metadata types. Comma separated list. If not set all types are sent. Only recommended for resending errored loads.")
 @click.option("--disable-ssl-verification", is_flag=True, show_default=True, default=False, help="Disable SSL certificate verification. This is only recommended for testing or debug purposes.")
 @click.option("--items-per-chunk", type=int, help="Override the number of items to send per chunk/payload. Default is 75. Maximum is 150.")
 @click.option("--dry-run", is_flag=True, show_default=True, default=False, help="Split metadata JSON payload by priority hints. Only valid for output file (-o) or show (-S)")
-def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, priority, metadata_types, disable_ssl_verification, items_per_chunk, dry_run):
+def activate_cli(config, output_file, upload, show, api_token, registry_url, pipeline_uuid, payload_id, priority, metadata_types, disable_ssl_verification, items_per_chunk, dry_run):
     configfile = config
 
     # Change working directory to config file
@@ -68,12 +69,12 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
         click.echo(
             f"Activate scan complete. Results stored in {output_file.name}"
         )
-    if show:
-        click.echo("Printing to STDOUT")
-        click.echo(json.dumps(data, indent=4))
+    # if show:
+    #     click.echo("Printing to STDOUT")
+    #     click.echo(json.dumps(data, indent=4))
 
-    if upload:
-        if not config.config.get('registry', None):
+    if upload or dry_run:
+        if dry_run or not config.config.get('registry', None):
             click.echo("Error: No registry configured. Performing a dry run ONLY.")
         else:
             click.echo(f"Sending results to {config.config['registry']['url']}")
@@ -94,6 +95,7 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
 
         for status in config.registry.send_as_chunked_payloads(
             scanner,
+            payload_id=payload_id,
             metadata_types_to_send=metadata_types_to_send
         ):
             response = status['response']
@@ -105,13 +107,16 @@ def activate_cli(config, output_file, upload, show, api_token, registry_url, pip
             
             click.echo('{progress:4d}% - Sending Chunk #{chunk_number} - {items_in_chunk} of {total_items_in_priority} {metadata_type}(s) with priority {priority}'.format(progress=current_progress, **status))
             if response.status_code == 201:
+                if show:
+                    click.echo(json.dumps(status['data_sent'], indent=4)) 
                 click.echo('    OK')
                 click.echo('{progress:4d}% - Sent {items_sent} of {total_items_to_send} total'.format(progress=assumed_progress, **status))
             else:
                 number_of_errors += 1
-                error = response.content[:50]
-                if len(response.content) > 50:
-                    error += '...'
+                error = response.content
+                # [:50]
+                # if len(response.content) > 50:
+                #     error += '...'
                 click.echo('Failed to send payload - {description}: Error: {response.status_code} - {error}'.format(error=error, **status))
 
         click.echo('Upload complete. Status')

@@ -1,21 +1,24 @@
-[project]
+[tool.poetry]
 name = "activate"
 version = "0.2.0"
 description = ""
-authors = [
-    {name = "Aristotle Metadata", email="hello@aristotlemetadata.com"} 
-]
+authors = ["Aristotle Metadata <hello@aristotlemetadata.com>"]
 readme = "README.md"
+#python = ">=3.12"
 
-# requires-python = ">=3.12"
-dependencies = [
-    "click>=8.2.1",
-    "lxml>=6.0.1",
-    "pyyaml>=6.0.2",
-    "requests>=2.32.5",
-    "sqlalchemy>=2.0.43",
-    "turfpy>=0.0.8",
-]
+[tool.poetry.dependencies]
+python = "^3.12"
+click = ">=8.2.1"
+lxml = ">=6.0.1"
+pyyaml = ">=6.0.2"
+requests = ">=2.32.5"
+sqlalchemy = ">=2.0.43"
+turfpy = ">=0.0.8"
+pymysql = "^1.1.2"
 
-[project.scripts]
-activateme = 'cli.activate.cli:activate_cli'
+[tool.poetry.scripts]
+activateme = "cli.activate.cli:activate_cli"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

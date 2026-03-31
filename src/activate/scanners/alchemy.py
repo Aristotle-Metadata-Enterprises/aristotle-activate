@@ -53,12 +53,42 @@ class AlchemyScanner(Scanner):
     def get_dataset_names(self):
         return self.inspector.get_schema_names()
 
+    def calc_order_hints(self):
+        def _build_distribution_graph(_distributions: list):
+            _graph = {}
+            for _distribution in _distributions:
+                _dependencies = set([
+                    _src
+                    for _item in _distribution.get("distributionprovenance_set", [])
+                    for _src in _item.get("source_distributions", [])
+                ])
+                _graph[_distribution["uuid"]] = _dependencies
+            return _graph
+
+        from toposort import toposort
+        order_hint = 1
+        for item_type in ("datatype", "valuedomain"):
+            for active_id in self._metadata.get(item_type, {}).keys():
+                self.upsert_metadata_order(item_type, active_id, order_hint)
+            order_hint += 1
+
+        distribution_graph = _build_distribution_graph(list(self._metadata.get("distribution", {}).values()))
+        for level in toposort(distribution_graph):
+            for item in level:
+                self.upsert_metadata_order("distribution", item, order_hint)
+            order_hint += 1
+
+        for active_id in self._metadata.get("dataset", {}).keys():
+            self.upsert_metadata_order("dataset", active_id, order_hint)
+
     def scan_datasets(self):
         self.progress.update(1, "Scanning database tables")
         dataset_names = self.get_dataset_names()
         for schema_name in dataset_names:
             dataset = self.scan_dataset(schema_name)
             self.add_metadata("dataset", dataset["uuid"], dataset)
+
+        self.calc_order_hints()
 
         self.progress.finish()
 
@@ -71,26 +101,27 @@ class AlchemyScanner(Scanner):
             "uuid": self.make_active_id('dataset', schema_name),
             "name": schema_name,
             "datasetdistributionpath_set": [],
+            "datasetdistributiongroup_set": {
+                "name": "Root",
+                "order": 0,
+            }
         }
-
+        datasetdistributionpath_set = []
         for i, table in enumerate(self.metadata.tables.keys()):
             if table.startswith(f"{schema_name}."):
                 distribution = self.scan_distribution(schema_name, table)
                 self.add_metadata("distribution", distribution["uuid"], distribution)
 
                 dataset_dist_id = self.make_active_table_link_id(table)
-                dataset["datasetdistributionpath_set"].append(
+                datasetdistributionpath_set.append(
                     {
-                        "activate": {
-                            "id": dataset_dist_id,
-                        },
-                        "id": dataset_dist_id,
                         "order": i,
                         "distribution": distribution["uuid"],
                     }
                 )
                 self.progress.add(100 / self.number_of_tables)
-
+        if datasetdistributionpath_set:
+            dataset["datasetdistributiongroup_set"]["datasetdistributionpath_set"] = datasetdistributionpath_set
         return dataset
 
     def scan_distribution(self, schema_name, table_name) -> dict:
@@ -103,8 +134,8 @@ class AlchemyScanner(Scanner):
             "uuid": self.make_active_id('distribution', table.fullname),
             "name": str(table.name),
             # "updated_date": NOW
-            "format_type": self.engine.name,    
-            "distributiondataelementpath_set": [],
+            "format_type": self.engine.name,
+            "distributiondataelementpath_set": []
         }
 
         columns = table.columns
@@ -145,7 +176,7 @@ class AlchemyScanner(Scanner):
                     "active_datatype": active_datatype['uuid'],
                     "primary_key": column.primary_key,
                     "nullable": column.nullable,
-                    "foreign_key": foreign_key,
+                    "foreign_key": None,
                 },
                 "id": path_id,
                 "order": i,

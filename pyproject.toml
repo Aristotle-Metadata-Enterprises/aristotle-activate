@@ -14,7 +14,9 @@ dependencies = [
     "pyyaml>=6.0.2",
     "requests>=2.32.5",
     "sqlalchemy>=2.0.43",
+    "sqlglot>=27.29.0",
     "turfpy>=0.0.8",
+    "toposort>=1.10",
 ]
 
 [project.scripts]

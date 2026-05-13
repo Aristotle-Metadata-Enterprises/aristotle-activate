@@ -7,7 +7,7 @@ authors = [
 ]
 readme = "README.md"
 
-# requires-python = ">=3.12"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.2.1",
     "lxml>=6.0.1",
@@ -16,6 +16,13 @@ dependencies = [
     "sqlalchemy>=2.0.43",
     "turfpy>=0.0.8",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cli", "src/activate"]
 
 [project.scripts]
 activateme = 'cli.activate.cli:activate_cli'

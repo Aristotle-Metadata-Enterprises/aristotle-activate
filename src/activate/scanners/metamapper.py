@@ -67,6 +67,8 @@ class MetaMapperScanner(Scanner):
         for field, value in conf.get('fields', {}).items():
             item[field] = self.field_to_aristotle(value, row)
 
+        self.normalise_uuid(item, active_id)
+
         if on_create := conf.get('on_create', {}):
             item['on_create'] = {}
             for field, value in on_create.items():
@@ -85,3 +87,11 @@ class MetaMapperScanner(Scanner):
             
 
         return item
+
+    def normalise_uuid(self, item, activate_id):
+        supplied_uuid = (item.get('uuid') or '').strip().lower()
+
+        if supplied_uuid:
+            item['uuid'] = f'{activate_id}:{supplied_uuid}'
+        else:
+            item.pop('uuid', None)

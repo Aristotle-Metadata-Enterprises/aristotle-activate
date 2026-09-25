@@ -6,11 +6,9 @@ Scans a CSV File and tries to process it into Aristotle things
 
 """
 
-from activate.scanners.base import Scanner, VALUE_NOT_SET
-from activate.utils.config import Config
-
-from datetime import datetime
 import csv
+
+from activate.scanners.base import Scanner
 
 
 class MetaMapperScanner(Scanner):
@@ -51,6 +49,8 @@ class MetaMapperScanner(Scanner):
         with open(path) as f:
             reader = csv.DictReader(f)
             for i, row in enumerate(reader):
+                if not any(value and value.strip() for value in row.values()):
+                    continue
                 self.row_to_metadata(row)
 
     def row_to_metadata(self, row):
@@ -72,6 +72,7 @@ class MetaMapperScanner(Scanner):
             for field, value in on_create.items():
                 item['on_create'][field] = self.field_to_aristotle(value, row)
 
+        active_id = self.normalise_uuid(item, md_type, active_id)
         self.upsert_metadata(md_type, active_id, item, order_hint=conf.get('order_hint', None))
 
         for field, comp_conf in conf.get('components', {}).items():
@@ -82,6 +83,25 @@ class MetaMapperScanner(Scanner):
             with_order = bool(comp_conf.get('with_order', False))
 
             self.append_metadata_component(md_type, active_id, field, component, with_order)
-            
 
         return item
+
+    def normalise_uuid(self, item, md_type, active_id):
+        supplied_uuid = (item.get('uuid') or '').strip()
+
+        if not supplied_uuid:
+            item.pop('uuid', None)
+
+            if active_id is None or active_id in self._metadata[md_type]:
+                active_id = self.make_active_id(
+                    md_type,
+                    f'{active_id}:{len(self._metadata[md_type])}',
+                )
+
+            return active_id
+
+        if active_id is None:
+            active_id = self.make_active_id(md_type, supplied_uuid)
+
+        item['uuid'] = f'{active_id}:{supplied_uuid}'
+        return active_id

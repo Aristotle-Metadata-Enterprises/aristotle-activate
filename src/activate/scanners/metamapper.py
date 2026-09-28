@@ -87,12 +87,15 @@ class MetaMapperScanner(Scanner):
         return item
 
     def normalise_uuid(self, item, md_type, active_id):
+        has_uuid_field = 'uuid' in item
         supplied_uuid = (item.get('uuid') or '').strip()
 
         if not supplied_uuid:
             item.pop('uuid', None)
 
-            if active_id is None or active_id in self._metadata[md_type]:
+            if has_uuid_field and (
+                    active_id is None or active_id in self._metadata[md_type]
+            ):
                 active_id = self.make_active_id(
                     md_type,
                     f'{active_id}:{len(self._metadata[md_type])}',

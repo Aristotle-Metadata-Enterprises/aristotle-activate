@@ -20,6 +20,7 @@ class MetaMapperScanner(Scanner):
         # Caller-supplied file_path takes priority over the YAML 'file' key.
         # The YAML 'file' key remains supported so existing CLI invocations
         self._file_path = file_path
+        self._active_ids_with_uuids = {}
 
     @property
     def file_path(self):
@@ -54,6 +55,8 @@ class MetaMapperScanner(Scanner):
                 self.row_to_metadata(row)
 
     def row_to_metadata(self, row):
+        self._active_ids_with_uuids = {}
+
         for md_conf in self.options.get('metadata_types', []):
             md_type = md_conf['metadata_type']
             active_id = self.spec_to_active_id(md_type, md_conf['active_id'], row)
@@ -78,7 +81,8 @@ class MetaMapperScanner(Scanner):
         for field, comp_conf in conf.get('components', {}).items():
             component = {}
             for sub_field, value in comp_conf.get('fields', {}).items():
-                component[sub_field] = self.field_to_aristotle(value, row)
+                resolved = self.field_to_aristotle(value, row)
+                component[sub_field] = self.normalise_active_id_reference(resolved)
 
             with_order = bool(comp_conf.get('with_order', False))
 
@@ -107,4 +111,23 @@ class MetaMapperScanner(Scanner):
             active_id = self.make_active_id(md_type, supplied_uuid)
 
         item['uuid'] = f'{active_id}:{supplied_uuid}'
+        self._active_ids_with_uuids[active_id] = item['uuid']
         return active_id
+
+    def normalise_active_id_reference(self, value):
+        if isinstance(value, dict):
+            return {
+                key: self.normalise_active_id_reference(item)
+                for key, item in value.items()
+            }
+
+        if isinstance(value, list):
+            return [
+                self.normalise_active_id_reference(item)
+                for item in value
+            ]
+
+        if isinstance(value, str):
+            return self._active_ids_with_uuids.get(value, value)
+
+        return value

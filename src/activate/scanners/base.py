@@ -1,4 +1,5 @@
 import hashlib
+import uuid as uuid_lib
 from importlib import import_module
 from collections import defaultdict
 from sqlalchemy.ext.automap import automap_base
@@ -28,6 +29,7 @@ class Scanner:
         self.progress = progress_callback
         self._metadata = defaultdict(dict)
         self._metadata_order = defaultdict(dict)
+        self._uuid_active_ids = set()
 
         self.activate_options = self.config.config.get('activate_options', {})
         ns_sep = self.activate_options.get('namespace_separator', None)
@@ -129,19 +131,25 @@ class Scanner:
     def upsert_metadata_order(self, item_type, active_id, order_hint):
         self._metadata_order[item_type][active_id] = order_hint
 
-    def upsert_metadata(self, item_type, active_id, item={}, order_hint=None):
+    def upsert_metadata(self, item_type, active_id, item=None, order_hint=None):
+        item = {} if item is None else item
         if item.get('uuid', None) is None:
             if active_id is not None:
                 item['uuid'] = active_id
             else:
                 return
-        
+
         if order_hint is not None:
             self.upsert_metadata_order(item_type, active_id, order_hint)
 
         if active_id not in self._metadata[item_type].keys():
             self.add_metadata(item_type, active_id, item)
-        
+        elif active_id in self._uuid_active_ids:
+            # Rows with the same UUID are one item: the last row wins
+            existing = self._metadata[item_type][active_id]
+            existing['on_create'].update(item.pop('on_create', {}))
+            existing.update(item)
+
     def append_metadata_component(self, item_type, active_id, component_name, component, with_order=False, force_unique=True):
         self.upsert_metadata(item_type, active_id)
 
@@ -321,6 +329,16 @@ class Scanner:
         return final_value
 
     def spec_to_active_id(self, metadatatype, conf, row):
+        if uuid_column := conf.get('uuid_column', None):
+            if raw_uuid := (row.get(uuid_column, None) or '').strip():
+                try:
+                    supplied_uuid = str(uuid_lib.UUID(raw_uuid))
+                except ValueError:
+                    raise ValueError(f"Invalid UUID '{raw_uuid}' in column '{uuid_column}'")
+                active_id = f"{self.make_active_id(metadatatype, 'uuid+' + supplied_uuid)}:{supplied_uuid}"
+                self._uuid_active_ids.add(active_id)
+                return active_id
+
         fields = [conf['prefix']]
         for column in conf['columns']:
             if field := row.get(column, None):
@@ -329,4 +347,3 @@ class Scanner:
                 return None
         identifier = '+'.join(fields)
         return self.make_active_id(metadatatype, identifier)
-

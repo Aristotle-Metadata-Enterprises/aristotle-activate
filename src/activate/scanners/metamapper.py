@@ -51,6 +51,8 @@ class MetaMapperScanner(Scanner):
         with open(path) as f:
             reader = csv.DictReader(f)
             for i, row in enumerate(reader):
+                if not any((value or '').strip() for key, value in row.items() if key is not None):
+                    continue
                 self.row_to_metadata(row)
 
     def row_to_metadata(self, row):

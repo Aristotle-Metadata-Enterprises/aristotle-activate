@@ -129,6 +129,33 @@ class MetaMapperScannerTests(unittest.TestCase):
 
         self.assertEqual(len(items), 2)
 
+    def test_component_active_id_uses_supplied_uuid(self):
+        scanner = self.make_scanner()
+        supplied_uuid = 'f5e98096-bba0-11f1-85ae-3ad39c79e97f'
+        distribution_active_id = scanner.make_active_id(
+            'distribution',
+            'Distribution+Updated distribution',
+        )
+
+        item = {
+            'uuid': supplied_uuid,
+            'name': 'Updated distribution',
+        }
+
+        scanner.normalise_uuid(
+            item,
+            'distribution',
+            distribution_active_id,
+        )
+
+        reference = scanner.normalise_active_id_reference(
+            distribution_active_id
+        )
+
+        self.assertEqual(
+            reference,
+            f'{distribution_active_id}:{supplied_uuid}',
+        )
 
 if __name__ == '__main__':
     unittest.main()

@@ -331,6 +331,8 @@ class Scanner:
     def spec_to_active_id(self, metadatatype, conf, row):
         if uuid_column := conf.get('uuid_column', None):
             if raw_uuid := (row.get(uuid_column, None) or '').strip():
+                if uuid_column not in row:
+                    raise ValueError(f"Column '{uuid_column}' set as uuid_column is missing from the CSV")
                 try:
                     supplied_uuid = str(uuid_lib.UUID(raw_uuid))
                 except ValueError:

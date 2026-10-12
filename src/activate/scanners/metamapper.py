@@ -19,8 +19,6 @@ class MetaMapperScanner(Scanner):
     def __init__(self, *args, file_path=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.options = self.config.config['connector']['options']
-        # Caller-supplied file_path takes priority over the YAML 'file' key.
-        # The YAML 'file' key remains supported so existing CLI invocations
         self._file_path = file_path
 
     @property

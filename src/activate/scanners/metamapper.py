@@ -46,9 +46,9 @@ class MetaMapperScanner(Scanner):
                 "No CSV file provided: pass file_path to MetaMapperScanner "
                 "or set 'file' under connector.options in the YAML."
             )
-        with open(path) as f:
+        with open(path, encoding='utf-8-sig', newline='') as f:
             reader = csv.DictReader(f)
-            #ignore spaces around headers
+            # ignore spaces around headers
             csv_headers = reader.fieldnames
             clean_header = []
             for header in csv_headers:

@@ -16,9 +16,17 @@ import csv
 class MetaMapperScanner(Scanner):
     name = "metamapper"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, file_path=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.options = self.config.config['connector']['options']
+        self._file_path = file_path
+
+    @property
+    def file_path(self):
+        """Resolve the CSV path: caller-supplied wins, else YAML 'file' key."""
+        if self._file_path:
+            return self._file_path
+        return self.options.get('file')
 
     @property
     def active_id_namespace(self):
@@ -31,9 +39,25 @@ class MetaMapperScanner(Scanner):
         return self.scan_rows()
 
     def scan_rows(self):
-        with open(self.options['file']) as f:
+        path = self.file_path
+        if not path:
+            from activate.utils.exceptions import ActivateConfigError
+            raise ActivateConfigError(
+                "No CSV file provided: pass file_path to MetaMapperScanner "
+                "or set 'file' under connector.options in the YAML."
+            )
+        with open(path, encoding='utf-8-sig', newline='') as f:
             reader = csv.DictReader(f)
-            for i, row in enumerate(csv.DictReader(f)):
+            # ignore spaces around headers
+            csv_headers = reader.fieldnames
+            clean_header = []
+            for header in csv_headers:
+                clean_header.append(header.strip())
+            reader.fieldnames = clean_header
+
+            for i, row in enumerate(reader):
+                if not any((value or '').strip() for key, value in row.items() if key is not None):
+                    continue
                 self.row_to_metadata(row)
 
     def row_to_metadata(self, row):

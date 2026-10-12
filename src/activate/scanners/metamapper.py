@@ -55,6 +55,7 @@ class MetaMapperScanner(Scanner):
             clean_header = []
             for header in csv_headers:
                 clean_header.append(header.strip())
+            reader.fieldnames = clean_header
 
             for i, row in enumerate(reader):
                 if not any((value or '').strip() for key, value in row.items() if key is not None):
